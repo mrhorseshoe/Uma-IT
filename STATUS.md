@@ -115,11 +115,16 @@ way, and for the rules any new handler has to respect.
         learns, and the task's own list is serialized, so the run works on a
         copy
 
+- [x] Spark reroll and skill priorities in the dashboard — both sections stay
+      hidden until their feature is switched on, so the default view is still
+      the handful of fields a plain run needs
+      — sparks are chips that cycle off / 1 / 2 / 3 stars; skills are chip
+        lists with autocomplete off `/api/skills`, which matters because a
+        skill name is OCR'd and fuzzy-matched, so a typo is a skill that never
+        gets bought and nothing says why
+      — `check_ui.py` now also pins the spark names against `parse.py`
+
 ## Next
-- [ ] Expose spark reroll and the skill priority list in the dashboard. Both
-      are more than a switch - a name -> stars map and a list of tiers - and
-      both are usable over the API meanwhile. The seven settings the page does
-      show are the ones a run actually needs
 - [ ] A first live career. `start.py` has still never faced the game, and the
       `after_hook` Skip question is still open. Both need TP
 

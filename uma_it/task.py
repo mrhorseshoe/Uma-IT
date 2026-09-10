@@ -59,7 +59,9 @@ class TaskDetail:
     learn_skill_list: list[list[str]]
     learn_skill_blacklist: list[str]
     learn_skill_only_user_provided: bool
-    learn_skill_threshold: int
+    # No `learn_skill_threshold`. In the parent it gates mid-career buying on
+    # the per-turn skill point total, and there are no turns here: skills are
+    # only ever bought at the end of a run.
     # No `manual_purchase_at_end`. It exists in the parent to pause the bot
     # while the user buys skills by hand, through a flow that blocks the bot
     # thread polling the web server, with a bare input() as its fallback.
@@ -159,7 +161,6 @@ def build_task(task_execute_mode: TaskExecuteMode, task_type: int,
     td.learn_skill_blacklist = list(data.get('learn_skill_blacklist') or [])
     td.learn_skill_only_user_provided = bool(
         data.get('learn_skill_only_user_provided', False))
-    td.learn_skill_threshold = _int(data.get('learn_skill_threshold'), 888, 0)
 
     td.spark_reroll_enabled = bool(data.get('spark_reroll_enabled', False))
     td.spark_reroll_min_stars = _int(data.get('spark_reroll_min_stars'), 3, 1, 3)

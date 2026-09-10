@@ -123,6 +123,47 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .summary .k { color: var(--muted); }
 .empty { color: var(--muted); font-size: 14px; }
 
+/* Sections that only exist when their feature is on. Kept out of the default
+   view so the form stays the seven fields a run actually needs. */
+.block { padding: 4px 0 2px 14px; margin: 2px 0 6px; border-left: 2px solid var(--line); }
+.block > .field:first-child { padding-top: 4px; }
+.block .field { border-bottom: 0; padding: 7px 0; }
+.block .field label { font-size: 13px; }
+
+.tagbox { flex: 1; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+.chips:empty { display: none; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 12px;
+  padding: 3px 5px 3px 9px; border-radius: 999px;
+  background: var(--bg); border: 1px solid var(--line);
+}
+.chip button {
+  all: unset; cursor: pointer; line-height: 1; padding: 0 3px; border-radius: 999px;
+  color: var(--muted); font-size: 13px;
+}
+.chip button:hover { color: var(--bad); }
+.tagbox input { width: 100%; }
+
+.sparks { display: flex; flex-wrap: wrap; gap: 5px; }
+.spark {
+  font: inherit; font-size: 12px; padding: 4px 9px; border-radius: 999px;
+  border: 1px solid var(--line); background: transparent; color: var(--muted);
+  cursor: pointer;
+}
+.spark:hover { border-color: var(--muted); }
+.spark.on { color: var(--text); border-color: var(--accent-dim); }
+.spark .st { color: var(--accent); font-size: 11px; }
+.sparks .sep { flex-basis: 100%; height: 0; }
+
+.seg { display: flex; gap: 0; }
+.seg button {
+  border-radius: 0; font-size: 12px; padding: 6px 12px; color: var(--muted);
+}
+.seg button:first-child { border-radius: 7px 0 0 7px; }
+.seg button:last-child { border-radius: 0 7px 7px 0; margin-left: -1px; }
+.seg button.on { color: var(--text); border-color: var(--accent-dim); z-index: 1; }
+
 pre#log {
   margin: 0; max-height: 300px; overflow: auto; font-size: 12px; line-height: 1.55;
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -210,10 +251,66 @@ pre#log {
     </div>
     <div class="field">
       <label for="skills">Skip skill buying
-        <span class="hint">Skill buying is not implemented yet; turning this off finishes the career without it</span>
+        <span class="hint">Off spends the career's skill points on the priorities below</span>
       </label>
       <span class="switch"><input type="checkbox" id="skills" checked><span></span></span>
     </div>
+    <div class="block" id="skills-block" hidden>
+      <div class="field">
+        <label>Priority 1<span class="hint">Bought first, while points last</span></label>
+        <div class="tagbox" id="tier0"></div>
+      </div>
+      <div class="field">
+        <label>Priority 2</label>
+        <div class="tagbox" id="tier1"></div>
+      </div>
+      <div class="field">
+        <label>Priority 3</label>
+        <div class="tagbox" id="tier2"></div>
+      </div>
+      <div class="field">
+        <label>Never buy</label>
+        <div class="tagbox" id="blacklist"></div>
+      </div>
+      <div class="field">
+        <label for="onlymine">Only buy what I list
+          <span class="hint">Off falls back to a built-in tier list once yours runs out</span>
+        </label>
+        <span class="switch"><input type="checkbox" id="onlymine"><span></span></span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="reroll">Reroll sparks
+        <span class="hint">Pays 30 TP for a second roll when the first has none you want</span>
+      </label>
+      <span class="switch"><input type="checkbox" id="reroll"><span></span></span>
+    </div>
+
+    <div class="block" id="spark-block" hidden>
+      <div class="field">
+        <label>Sparks worth keeping
+          <span class="hint">Click to set the stars each must reach</span>
+        </label>
+      </div>
+      <div class="sparks" id="sparks"></div>
+      <div class="field">
+        <label>Needs
+          <span class="hint">Blue and pink are separate groups</span>
+        </label>
+        <div class="seg">
+          <button type="button" id="mode-or" data-mode="or">Either group</button>
+          <button type="button" id="mode-and" data-mode="and">Both groups</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="stopreroll">Stop at the reroll screen
+          <span class="hint">Ends a single-run task there so you can reroll by hand</span>
+        </label>
+        <span class="switch"><input type="checkbox" id="stopreroll"><span></span></span>
+      </div>
+    </div>
+
     <div class="field">
       <label for="tp">Spend to restore TP
         <span class="hint">Off fails a career instead of paying. On can spend carats.</span>
@@ -224,6 +321,7 @@ pre#log {
       <button type="submit" class="primary" id="save">Save task</button>
       <button type="button" class="quiet" id="cancel">Cancel</button>
     </div>
+    <datalist id="skill-names"></datalist>
   </form>
 </section>
 
@@ -249,9 +347,121 @@ const STATUS = { 1: "Pending", 2: "Running", 3: "Interrupted", 4: "Done", 5: "Fa
                  6: "Scheduled", 7: "Cancelled" };
 
 const $ = (id) => document.getElementById(id);
+
+// The spark names the bot can match, in the two groups it scores separately.
+// uma_it/parse.py is the source of truth; check_ui.py fails if these drift.
+const SPARK_BLUE = ["Speed", "Stamina", "Power", "Guts", "Wit"];
+const SPARK_PINK = ["Turf", "Dirt", "Sprint", "Mile", "Medium", "Long",
+                    "Front Runner", "Pace Chaser", "Late Surger", "End Closer"];
 let task = null;
 let editing = false;
 let noteTimer = null;
+let sparkTargets = {};   // name -> minimum stars
+let sparkMode = "or";
+const tagBoxes = {};     // id -> TagBox
+
+/* A list of names, edited as chips. Used for the three skill tiers and the
+   blacklist. Autocomplete matters here: a skill name is OCR'd off the screen
+   and fuzzy-matched against the shipped database, so a typo is a skill that
+   never gets bought and nothing says why. */
+class TagBox {
+  constructor(id) {
+    this.el = $(id);
+    this.values = [];
+    this.chips = document.createElement("div");
+    this.chips.className = "chips";
+    this.input = document.createElement("input");
+    this.input.type = "text";
+    this.input.setAttribute("list", "skill-names");
+    this.input.placeholder = "Add a skill…";
+    this.input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); this.add(this.input.value); }
+      else if (e.key === "Backspace" && !this.input.value) this.remove(this.values.length - 1);
+    });
+    // Picking from the datalist fires input, not keydown.
+    this.input.addEventListener("input", () => {
+      if (SKILL_NAMES.has(this.input.value)) this.add(this.input.value);
+    });
+    this.el.append(this.chips, this.input);
+  }
+  set(values) { this.values = (values || []).slice(); this.render(); }
+  get() { return this.values.slice(); }
+  add(name) {
+    name = (name || "").trim();
+    if (name && !this.values.includes(name)) this.values.push(name);
+    this.input.value = "";
+    this.render();
+  }
+  remove(i) { if (i >= 0) { this.values.splice(i, 1); this.render(); } }
+  render() {
+    this.chips.replaceChildren(...this.values.map((name, i) => {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.append(name);
+      const x = document.createElement("button");
+      x.type = "button";
+      x.textContent = "×";
+      x.title = "Remove " + name;
+      x.onclick = () => this.remove(i);
+      chip.append(x);
+      return chip;
+    }));
+  }
+}
+
+let SKILL_NAMES = new Set();
+
+async function loadSkillNames() {
+  try {
+    const data = await api("/api/skills").then((r) => r.json());
+    const names = (Array.isArray(data) ? data : []).map((s) => s && s.name).filter(Boolean);
+    SKILL_NAMES = new Set(names);
+    $("skill-names").replaceChildren(...names.map((n) => {
+      const o = document.createElement("option");
+      o.value = n;
+      return o;
+    }));
+  } catch (e) {
+    // Autocomplete is a convenience; typing a name by hand still works.
+  }
+}
+
+function buildSparks() {
+  const host = $("sparks");
+  const make = (name) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "spark";
+    b.dataset.name = name;
+    b.onclick = () => {
+      // off -> 1 -> 2 -> 3 -> off
+      const next = ((sparkTargets[name] || 0) + 1) % 4;
+      if (next) sparkTargets[name] = next; else delete sparkTargets[name];
+      renderSparks();
+    };
+    return b;
+  };
+  const sep = document.createElement("span");
+  sep.className = "sep";
+  host.replaceChildren(...SPARK_BLUE.map(make), sep, ...SPARK_PINK.map(make));
+  renderSparks();
+}
+
+function renderSparks() {
+  for (const b of $("sparks").querySelectorAll(".spark")) {
+    const stars = sparkTargets[b.dataset.name] || 0;
+    b.classList.toggle("on", stars > 0);
+    b.replaceChildren(b.dataset.name);
+    if (stars) {
+      const s = document.createElement("span");
+      s.className = "st";
+      s.textContent = " " + "★".repeat(stars);
+      b.append(s);
+    }
+  }
+  $("mode-or").classList.toggle("on", sparkMode === "or");
+  $("mode-and").classList.toggle("on", sparkMode === "and");
+}
 
 function note(text, bad) {
   const el = $("note");
@@ -330,7 +540,24 @@ function renderTask() {
     ["Legacy", d.use_last_parents ? "keep last" : "auto-select"],
     ["Skills", d.skip_learn_skill ? "skipped" : "requested"],
     ["TP", d.allow_recover_tp ? "may spend" : "never spend"],
+    ...(d.skip_learn_skill ? [] : [["Priorities", tierSummary(d)]]),
+    ...(d.spark_reroll_enabled ? [["Reroll", sparkSummary(d)]] : []),
   ].map(([k, v]) => `<div><span class="k">${k}</span> ${v}</div>`).join("");
+}
+
+function tierSummary(d) {
+  const n = (d.learn_skill_list || []).reduce((a, t) => a + (t || []).length, 0);
+  if (!n) return "built-in tiers";
+  return `${n} skill${n === 1 ? "" : "s"}` +
+         (d.learn_skill_only_user_provided ? ", only these" : "");
+}
+
+function sparkSummary(d) {
+  const t = d.spark_reroll_targets || {};
+  const names = Object.keys(t);
+  if (!names.length) return "no targets - will not reroll";
+  const shown = names.map((k) => `${k} ${t[k]}★`).join(", ");
+  return shown + (d.spark_reroll_mode === "and" ? " (both groups)" : "");
 }
 
 function openForm() {
@@ -343,8 +570,27 @@ function openForm() {
   $("parents").checked = d.use_last_parents ?? true;
   $("skills").checked = d.skip_learn_skill ?? true;
   $("tp").checked = !!d.allow_recover_tp;
+
+  const tiers = d.learn_skill_list || [];
+  for (let i = 0; i < 3; i++) tagBoxes["tier" + i].set(tiers[i] || []);
+  tagBoxes.blacklist.set(d.learn_skill_blacklist || []);
+  $("onlymine").checked = !!d.learn_skill_only_user_provided;
+
+  sparkTargets = Object.assign({}, d.spark_reroll_targets || {});
+  sparkMode = d.spark_reroll_mode === "and" ? "and" : "or";
+  $("reroll").checked = !!d.spark_reroll_enabled;
+  $("stopreroll").checked = !!d.stop_at_spark_reroll;
+  renderSparks();
+  syncBlocks();
+
   $("task-view").hidden = true;
   $("form").hidden = false;
+}
+
+/* Each feature's settings only exist while the feature is on. */
+function syncBlocks() {
+  $("skills-block").hidden = $("skills").checked;
+  $("spark-block").hidden = !$("reroll").checked;
 }
 
 function closeForm() {
@@ -365,6 +611,13 @@ async function saveTask(ev) {
     loops_done: (task && task.detail && task.detail.loops_done) || 0,
     use_last_parents: $("parents").checked,
     skip_learn_skill: $("skills").checked,
+    learn_skill_list: [0, 1, 2].map((i) => tagBoxes["tier" + i].get()),
+    learn_skill_blacklist: tagBoxes.blacklist.get(),
+    learn_skill_only_user_provided: $("onlymine").checked,
+    spark_reroll_enabled: $("reroll").checked,
+    spark_reroll_targets: sparkTargets,
+    spark_reroll_mode: sparkMode,
+    stop_at_spark_reroll: $("stopreroll").checked,
     // The engine reads this as a level, not a flag: 0 never spends, higher
     // values authorise it, carats included.
     allow_recover_tp: $("tp").checked ? 2 : 0,
@@ -430,6 +683,14 @@ async function loadLog(taskId) {
 $("start").onclick = () => act("/action/bot/start", "Started");
 $("stop").onclick = () => act("/action/bot/stop", "Stopping");
 $("finish").onclick = () => act("/action/bot/stop-after-run", "Will stop after this run");
+for (const id of ["tier0", "tier1", "tier2", "blacklist"]) tagBoxes[id] = new TagBox(id);
+buildSparks();
+loadSkillNames();
+$("skills").onchange = syncBlocks;
+$("reroll").onchange = syncBlocks;
+$("mode-or").onclick = () => { sparkMode = "or"; renderSparks(); };
+$("mode-and").onclick = () => { sparkMode = "and"; renderSparks(); };
+
 $("new").onclick = () => openForm();
 $("edit").onclick = () => openForm();
 $("cancel").onclick = () => closeForm();

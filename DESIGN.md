@@ -74,9 +74,9 @@ The dashboard is the sharpest example. The parent's is a Vue 3 + Vite app whose
 task modal alone is 5,330 lines - 160 `data()` properties and 101 methods, most
 of them configuring a career this app does not play - and it loads Bootstrap
 and jQuery from a CDN, so it needs the internet to render a page about an
-emulator on the same machine. This one is a single 456-line HTML file with no
-build step, no framework and no network dependency. It exposes seven settings,
-which is what an Independent Training task actually has.
+emulator on the same machine. This one is a single HTML file with no build step, no framework and no network
+dependency. It shows seven fields by default - what a plain run needs - and
+reveals the skill and spark sections only when those features are switched on.
 
 ## Layout
 

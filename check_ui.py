@@ -79,6 +79,23 @@ check("every scenario option maps to a ScenarioType", offered <= valid,
 check("  and none of the real scenarios is missing", valid <= offered,
       f"{sorted(valid - offered)} not offered")
 
+print("\nthe spark names the page offers are the ones the bot can match")
+# The page hardcodes them so it needs no extra endpoint; parse.py is the source
+# of truth. A name that drifts here is a target the user can set and the bot
+# can never hit, with nothing to say so.
+from uma_it.parse import SPARK_BLUE_NAMES, SPARK_PINK_NAMES
+
+
+def js_list(name):
+    m = re.search(name + r'\s*=\s*\[(.*?)\];', html, re.S)
+    return re.findall(r'"([^"]+)"', m.group(1)) if m else []
+
+
+check("the blue group matches parse.py", js_list('SPARK_BLUE') == list(SPARK_BLUE_NAMES),
+      str(js_list('SPARK_BLUE')))
+check("the pink group matches parse.py", js_list('SPARK_PINK') == list(SPARK_PINK_NAMES),
+      str(js_list('SPARK_PINK')))
+
 print("\nthe app name the page posts matches the app")
 from uma_it.task import APP_NAME
 posted = re.search(r'app_name:\s*"([^"]+)"', html)

@@ -8,8 +8,8 @@ are not:
   against;
 * Scenario Select, which must fail the task rather than start a career in the
   wrong scenario;
-* the finish screen, which must still finish a career when it is asked for a
-  feature this app has not written yet.
+* the finish screen, which is the only way into skill buying and gets visited
+  repeatedly until a pass buys nothing.
 """
 import os, sys
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -182,13 +182,30 @@ check("with skills off it confirms", ctx.ctrl.clicks == [NAME(CULTIVATE_FINISH_C
       str(ctx.ctrl.clicks))
 check("  and marks the career finished", ctx.career.career_finished is True)
 
-# Skill buying is not written here. Asking for it must not strand the career on
-# this screen, which is what doing nothing would do.
+# With skills on, the finish screen is the way *into* the skill screen. It gets
+# visited repeatedly: buying spends points, so a later pass can afford things
+# an earlier one could not. A pass that selects nothing ends the sweep.
+from uma_it.asset.point import CULTIVATE_FINISH_LEARN_SKILL
+
 ctx = FakeCtx(skip_learn_skill=False)
 collect.script_cultivate_finish(ctx)
-check("with skills on it still finishes the career",
+check("with skills on it opens the skill screen",
+      ctx.ctrl.clicks == [NAME(CULTIVATE_FINISH_LEARN_SKILL)], str(ctx.ctrl.clicks))
+check("  and marks the career finished", ctx.career.career_finished is True)
+check("  with a sweep in progress", ctx.career.final_skill_sweep_active is True)
+
+ctx.ctrl.clicks.clear()
+ctx.career.learn_skill_selected = True      # last pass bought something
+collect.script_cultivate_finish(ctx)
+check("a pass that bought something goes back for more",
+      ctx.ctrl.clicks == [NAME(CULTIVATE_FINISH_LEARN_SKILL)], str(ctx.ctrl.clicks))
+
+ctx.ctrl.clicks.clear()
+ctx.career.learn_skill_selected = False     # nothing left to buy
+collect.script_cultivate_finish(ctx)
+check("a pass that bought nothing ends the sweep",
       ctx.ctrl.clicks == [NAME(CULTIVATE_FINISH_CONFIRM)], str(ctx.ctrl.clicks))
-check("  and marks it finished", ctx.career.career_finished is True)
+check("  and clears the sweep flag", ctx.career.final_skill_sweep_active is False)
 
 ctx = FakeCtx(skip_learn_skill=True, career_state={'career_finished': True})
 collect.script_cultivate_finish(ctx)
