@@ -6,9 +6,14 @@ way, and for the rules any new handler has to respect.
 ## Done
 
 - [x] Repository, layout and design recorded
-- [x] Engine vendored unchanged — `bot/`, 3,566 lines, 35 files
+- [x] Engine vendored — `bot/`, 3,566 lines, 34 importable modules
+      — seven references into the parent's game module found; the three
+        top-level ones repointed at `uma_it/asset/`, `/api/pal-defaults`
+        stubbed. `check_engine.py`: all 34 import, nothing from the parent
+        project loads
 - [x] Calibrated assets moved verbatim and verified
-      — 28 template PNGs, 28 template declarations, 22 screens, 38 click points
+      — 34 template PNGs (28 for screens, 6 the engine requires), 22 screens,
+        38 click points
       — `check_assets.py`: all resolve, all decode, no screen references a
         template outside the package
 - [x] Dialog title scoring set extracted — 23 owned, 36 distractors, 59 total
@@ -56,5 +61,22 @@ py -3.10 check_assets.py
 py -3.10 check_titles.py
 ```
 
-Both exit non-zero on failure. Run them after touching anything under
-`uma_it/asset/`.
+```bash
+py -3.10 check_engine.py
+```
+
+All three exit non-zero on failure. Run them after touching anything under
+`uma_it/asset/` or `bot/`.
+
+## Known no-ops, deliberately left
+
+Three engine hooks that invalidate the parent project's parse cache and its
+skills and events databases are wrapped in `except Exception: pass`, so here
+they do nothing and say nothing. Harmless today. If this project grows a skills
+or events database, they must be revisited — `bot/base/purge.py:370`,
+`bot/server/handler.py:176` and `:234`.
+
+The dashboard's year / mood / energy readout is a turn-by-turn concept. Its
+templates were carried over so nothing regresses, but nothing in an Independent
+Training run branches on mood; decide what the readout should be when the UI is
+rebuilt.

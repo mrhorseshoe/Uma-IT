@@ -46,3 +46,22 @@ REF_BORROW_CARD = Template("borrow_card", REF_TEMPLATE_PATH)
 # tells the two career modes apart - the inactive tab is white with dark text.
 REF_INDEPENDENT_TRAINING_TAB = Template("independent_training_tab", REF_TEMPLATE_PATH)
 REF_NEXT = Template("next", REF_TEMPLATE_PATH)
+
+# --- required by the vendored engine ------------------------------------
+# The engine reaches for these two by name. They are not part of any screen
+# definition, which is why they arrive separately from the 28 above.
+
+# bot/conn/u2_ctrl.py safety_dont_click(): blocks a tap in the region
+# (263..458, 559..808) when this marker is on screen.
+REF_DONT_CLICK = Template("DONT_CLICK", REF_TEMPLATE_PATH)
+
+# bot/conn/fetch.py read_mood(): the dashboard's motivation readout. Mood is a
+# turn-by-turn concept and nothing in an Independent Training run branches on
+# it - see STATUS.md before carrying this into the new UI.
+REF_MOTIVATION_1 = Template("MOTIVATION_1", REF_TEMPLATE_PATH)
+REF_MOTIVATION_2 = Template("MOTIVATION_2", REF_TEMPLATE_PATH)
+REF_MOTIVATION_3 = Template("MOTIVATION_3", REF_TEMPLATE_PATH)
+REF_MOTIVATION_4 = Template("MOTIVATION_4", REF_TEMPLATE_PATH)
+REF_MOTIVATION_5 = Template("MOTIVATION_5", REF_TEMPLATE_PATH)
+MOTIVATION_LIST = [REF_MOTIVATION_1, REF_MOTIVATION_2, REF_MOTIVATION_3,
+                   REF_MOTIVATION_4, REF_MOTIVATION_5]

@@ -35,10 +35,29 @@ construction.
 
 Three tiers, and the distinction is the whole design:
 
-**Reused unchanged — `bot/` (3,566 lines).** Screenshots, template matching,
-OCR, taps, the click guard, the freeze watchdog, the scheduler, the HTTP
-server. It is game-agnostic and was exercised for 21 hours straight by the loop
-this project replaces. It is vendored here as-is. Do not rewrite it.
+**Vendored — `bot/` (3,566 lines).** Screenshots, template matching, OCR,
+taps, the click guard, the freeze watchdog, the scheduler, the HTTP server. It
+was exercised for 21 hours straight by the loop this project replaces, so it is
+copied here rather than rewritten. Do not rewrite it.
+
+It is *called* game-agnostic in the parent project and very nearly is, but not
+quite: seven places reach back into the parent's game module, and three of them
+were top-level imports that broke on arrival here. They are repointed at this
+project's asset layer:
+
+| Engine file | Wanted | Resolution |
+|---|---|---|
+| `engine/ctrl.py` | `asset.point import *`, for `ESCAPE` alone | imports `ESCAPE` by name |
+| `conn/u2_ctrl.py` | `REF_DONT_CLICK` | template moved here; it guards a real tap-blocking region |
+| `conn/fetch.py` | `MOTIVATION_LIST` | five templates moved here |
+| `server/handler.py` | `read_pal_defaults` | returns `{}`; "pal" is a turn-by-turn feature |
+
+Three further references — parse-cache and skills/events database
+invalidation in `base/purge.py` and `server/handler.py` — sit inside
+`try: ... except Exception: pass` and are therefore silent no-ops here. They
+are harmless, and they are also invisible, which is worse: if this project ever
+grows a skills or events database, those hooks will not fire and nothing will
+say so. `check_engine.py` pins the import surface.
 
 **Moved verbatim, never retyped — the calibrated assets.** The 28 template
 PNGs, the 22 screen definitions and the 38 click points are copied
@@ -74,6 +93,7 @@ uma_it/
   context.py          per-run state, all of it restart-durable
 check_assets.py       every template resolves and decodes
 check_titles.py       every owned dialog title wins its own frame
+check_engine.py       every engine module imports, and reaches back nowhere
 ```
 
 ## Rules this project inherits, each paid for in a live failure

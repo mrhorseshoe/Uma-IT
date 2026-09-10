@@ -4,7 +4,7 @@ from typing import Dict, Any, Optional
 from bot.conn.u2_ctrl import U2AndroidController
 from bot.recog.image_matcher import image_match, compare_color_equal
 from bot.recog.ocr import ocr_line
-from module.umamusume.asset import MOTIVATION_LIST
+from uma_it.asset.template import MOTIVATION_LIST
 
 shared_controller: Optional[U2AndroidController] = None
 

@@ -1,7 +1,7 @@
 from bot.base.manifest import APP_MANIFEST_LIST
 from bot.engine.scheduler import scheduler
 from bot.conn.u2_ctrl import U2AndroidController
-from module.umamusume.asset.point import *
+from uma_it.asset.point import ESCAPE
 
 
 def start():

@@ -15,7 +15,7 @@ from bot.conn.ctrl import AndroidController
 from bot.recog.image_matcher import template_match, image_match
 from config import CONFIG, Config
 from dataclasses import dataclass, field
-from module.umamusume.asset.template import REF_DONT_CLICK
+from uma_it.asset.template import REF_DONT_CLICK
 
 log = logger.get_logger(__name__)
 

@@ -424,8 +424,10 @@ def bot_status():
 
 @server.get("/api/pal-defaults")
 def get_pal_defaults():
-    from module.umamusume.user_data import read_pal_defaults
-    return read_pal_defaults()
+    # "Pal" support-card defaults are a turn-by-turn career feature; this app
+    # has no equivalent. Kept as an empty result rather than a 500 so a stale
+    # dashboard build cannot break on it.
+    return {}
 
 
 
