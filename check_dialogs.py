@@ -100,11 +100,40 @@ ctx = route('Auto Select', use_last_parents=False)
 check("  and lets the game choose otherwise",
       ctx.ctrl.clicks == [(214, 832, "Auto Select")], str(ctx.ctrl.clicks))
 
-print("\ncareer-start dialogs whose handlers are not written")
-for title in ('Final Confirmation', 'Independent Training', 'Choose Career Mode',
-              'Start Event'):
-    ctx = route(title)
-    check(f"{title!r} stays still", ctx.ctrl.clicks == [], str(ctx.ctrl.clicks))
+print("\nthe event start dialog is always backed out of")
+# The only one of the career-start group that acts here rather than in
+# start.py. Confirming it would begin an event career with no way out.
+ctx = route('Start Event')
+check("'Start Event' clears the dialog", ctx.ctrl.clicks == [NAME(ESCAPE)],
+      str(ctx.ctrl.clicks))
+
+print("\nthe career-start titles reach start.py")
+# What those handlers then do is check_start.py's business; this pins only that
+# the router hands them over rather than clearing them like a stray dialog.
+import uma_it.start as start_mod
+
+reached = []
+for title in ('Final Confirmation', 'Independent Training', 'Choose Career Mode'):
+    original = dialogs.DIALOGS[title]
+    dialogs.DIALOGS[title] = lambda _ctx, _t=title: reached.append(_t)
+    route(title)
+    dialogs.DIALOGS[title] = original
+check("all three dispatch into start.py",
+      reached == ['Final Confirmation', 'Independent Training', 'Choose Career Mode'],
+      str(reached))
+
+# The pending-run handler needs the dialog header's position to bound its
+# colour search. read_title stashes it; a wrong shape here would send the
+# search at the whole screen, where Delete Data lives.
+seen = []
+original = dialogs.DIALOGS['Independent Training']
+start_mod.script_independent_training_pending = lambda _ctx, pos: seen.append(pos)
+ctx = FakeCtx()
+ctx.career.dialog_header_pos = ((8, 391), (136, 440))
+dialogs.read_title = lambda _ctx: 'Independent Training'
+dialogs.DIALOGS['Independent Training'](ctx)
+check("the pending-run handler is given the header position",
+      seen == [((8, 391), (136, 440))], str(seen))
 
 print("\nthe agenda titles reach the picker")
 # What the picker then does is check_agenda.py's business. This pins only that

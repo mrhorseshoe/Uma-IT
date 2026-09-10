@@ -5,6 +5,8 @@ constants are pixel geometry measured against the live game at 720x1280, and
 the colour thresholds were tuned against real frames; both are calibration, and
 calibration gets moved, not redrawn.
 """
+import re
+
 import cv2
 import numpy
 
@@ -94,3 +96,114 @@ def agenda_row_names(origin_img, buttons):
             continue
         names.append((ocr_line(gray[band_top:band_bot, 45:520]) or '').strip())
     return names
+
+
+# The Scheduled / G1 / G2 / G3 boxes on the career start dialog.
+AGENDA_COUNT_REGIONS = {
+    'scheduled': (768, 812, 40, 260),
+    'g1': (652, 690, 495, 615),
+    'g2': (688, 726, 495, 615),
+    'g3': (724, 762, 495, 615),
+}
+
+
+def agenda_schedule_counts(origin_img):
+    """The Scheduled / G1 / G2 / G3 numbers from the career start dialog, or
+    None if any of them cannot be read.
+
+    These are the only visible sign that the right agenda loaded. The picker
+    can load the wrong entry with no error anywhere, which is how a four-race
+    schedule ran for fifteen careers unnoticed.
+    """
+    gray = cv2.cvtColor(origin_img, cv2.COLOR_BGR2GRAY)
+    out = {}
+    for key, (y0, y1, x0, x1) in AGENDA_COUNT_REGIONS.items():
+        text = (ocr_line(gray[y0:y1, x0:x1]) or '').strip().lower()
+        digits = re.sub(r'\D', '', re.sub(r'^(scheduled|g[123])', '', text))
+        if not digits:
+            return None
+        out[key] = int(digits)
+    return out
+
+
+def find_green_button(origin_img, x1: int, y1: int, x2: int, y2: int):
+    """Locate the brightest green button inside a region and return its center
+    (x, y), or None. Dialog OK / confirm buttons are saturated bright green;
+    buttons dimmed behind a dialog overlay fall below the thresholds.
+
+    Used where a fixed point would be dangerous - the pending-run dialog puts
+    "Delete Data" on the same screen as the button that resumes the career.
+    """
+    region = origin_img[y1:y2, x1:x2]
+    if region.size == 0:
+        return None
+    b = region[:, :, 0].astype(numpy.int32)
+    g = region[:, :, 1].astype(numpy.int32)
+    r = region[:, :, 2].astype(numpy.int32)
+    mask = ((g > 160) & (g - r > 50) & (g - b > 60) & (r < 190)).astype(numpy.uint8)
+    # pick a button-shaped connected component; plain centroid fails because
+    # the background art also contains large green streaks
+    count, labels, stats, centroids = cv2.connectedComponentsWithStats(mask, connectivity=8)
+    best = None
+    for i in range(1, count):
+        x, y, w_c, h_c, area = stats[i]
+        if not (100 <= w_c <= 400 and 30 <= h_c <= 110):
+            continue
+        if not (1.5 <= w_c / max(1, h_c) <= 9):
+            continue
+        # solid fill (allowing for the white label text punched out of it)
+        if area < 0.45 * w_c * h_c:
+            continue
+        if best is None or area > best[0]:
+            best = (area, int(centroids[i][0]), int(centroids[i][1]))
+    if best is None:
+        return None
+    return x1 + best[1], y1 + best[2]
+
+
+def describe_green_candidates(origin_img, x1: int, y1: int, x2: int, y2: int,
+                              limit: int = 3) -> str:
+    """Why `find_green_button` found nothing in this region.
+
+    The search returns None for two very different reasons and the caller
+    cannot tell them apart: either the green mask is empty - wrong region,
+    wrong colour, button not on screen - or the mask is fine and every
+    component was rejected by the shape filters. This reports the mask size and
+    the largest few components with the geometry the filters test, so the
+    answer is in the log instead of being guessed at.
+
+    Only called on the failure path, so it costs nothing in the normal case.
+    """
+    try:
+        region = origin_img[y1:y2, x1:x2]
+        if region.size == 0:
+            return "region empty"
+        b = region[:, :, 0].astype(numpy.int32)
+        g = region[:, :, 1].astype(numpy.int32)
+        r = region[:, :, 2].astype(numpy.int32)
+        mask = ((g > 160) & (g - r > 50) & (g - b > 60) & (r < 190)).astype(numpy.uint8)
+        on = int(mask.sum())
+        if on == 0:
+            return f"no green pixels in {x2 - x1}x{y2 - y1} region (mask empty)"
+        count, labels, stats, centroids = cv2.connectedComponentsWithStats(mask, connectivity=8)
+        blobs = sorted(
+            (int(stats[i][4]), int(stats[i][2]), int(stats[i][3])) for i in range(1, count))
+        blobs.reverse()
+        parts = []
+        for area, w_c, h_c in blobs[:limit]:
+            fill = area / max(1, w_c * h_c)
+            ar = w_c / max(1, h_c)
+            why = []
+            if not (100 <= w_c <= 400):
+                why.append("w")
+            if not (30 <= h_c <= 110):
+                why.append("h")
+            if not (1.5 <= ar <= 9):
+                why.append("ar")
+            if fill < 0.45:
+                why.append("fill")
+            parts.append(f"{w_c}x{h_c} area={area} ar={ar:.1f} fill={fill:.2f} "
+                         f"rejected_by={'+'.join(why) or 'none'}")
+        return f"{on} green px, {count - 1} blobs; largest: " + "; ".join(parts)
+    except Exception as e:
+        return f"diagnostic failed: {e!r}"

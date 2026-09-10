@@ -65,9 +65,19 @@ way, and for the rules any new handler has to respect.
         flow did not ask for is cancelled. Both budgets end a stuck flow by
         closing rather than by loading something
 
+- [x] `uma_it/start.py` — career start, the trainer-event failsafe and the
+      pending-run rescue. With it the agenda picker is reachable end to end for
+      the first time: Final Confirmation sets the phase it runs on
+      — `check_start.py`: 18 assertions, all about when a handler refuses to
+        act. The career-mode dialog switches to Normal and never confirms
+        unverified, giving up by failing the task once its budget is spent; an
+        unreadable frame counts as event mode, because guessing the other way
+        confirms a one-way door. The start dialog checks the tab rather than
+        assuming it. The pending-run dialog prefers the colour search, since
+        Delete Data sits on the same screen
+      — **still never run against the live game** (see DESIGN.md)
+
 ## Next
-- [ ] `uma_it/start.py` — career start, career-mode failsafe, pending-run
-      rescue. **The one part never run against the live game** (see DESIGN.md)
 - [ ] Enter and collect handlers — ~300 lines
 - [ ] `main.py` — device checks, scheduler, HTTP server
 - [ ] Web UI — IT-only; the parent project's task modal is 5,330 lines for a
@@ -77,7 +87,8 @@ way, and for the rules any new handler has to respect.
 ## Line budget
 
 Target is ~2,050 lines for the core and ~2,700 with both optional features,
-against the parent project's 9,415 lines of module Python.
+against the parent project's 9,415 lines of module Python. `uma_it/` is at
+**1,892** with the enter/collect handlers still to come.
 
 | Piece | Estimate |
 |---|---|
@@ -91,7 +102,7 @@ against the parent project's 9,415 lines of module Python.
 | Router and fallback (done) | 330 |
 | Countdown and results (done) | 90 |
 | Agenda picker and parse helpers (done) | 320 |
-| Start | ~210 |
+| Career start (done) | 200 |
 
 ## Checks
 
@@ -127,7 +138,11 @@ py -3.10 check_career.py
 py -3.10 check_agenda.py
 ```
 
-All eight exit non-zero on failure. Run them after touching anything under
+```bash
+py -3.10 check_start.py
+```
+
+All nine exit non-zero on failure. Run them after touching anything under
 `uma_it/` or `bot/`.
 
 ## Unresolved: do the Skip presses matter?

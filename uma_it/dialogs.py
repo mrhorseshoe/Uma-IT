@@ -40,7 +40,7 @@ from bot.recog.ocr import ocr_line, find_similar_text
 from bot.base.task import TaskStatus
 import bot.base.log as logger
 
-from uma_it import agenda
+from uma_it import agenda, start
 from uma_it.asset.template import UI_INFO, REF_NEXT
 from uma_it.asset.dialog_titles import ALL_TITLES
 from uma_it.asset.point import (
@@ -119,18 +119,6 @@ def _tap_xy(x, y, what: str):
         log.info(what)
         ctx.ctrl.click(x, y, what)
         time.sleep(1)
-    return action
-
-
-def _pending(what: str):
-    """A title whose handler is not written yet.
-
-    Clicks nothing. Every one of these is a career-start or agenda dialog where
-    a wrong click is expensive - Confirm on the career-start dialog is a
-    one-way door into an event career - so waiting is the safe placeholder.
-    """
-    def action(ctx):
-        log.warning(f"{what} - handler not written yet; clicking nothing")
     return action
 
 
@@ -234,12 +222,19 @@ DIALOGS = {
     'Items Selected': _silent("'Items Selected' prompt"),
 
     # -- starting a career, and recovering one already running ---------------
-    # The most consequential clicks the bot makes. Handlers pending; see
-    # STATUS.md for the order.
-    'Final Confirmation':   _pending("Final Confirmation (career start)"),
-    'Independent Training': _pending("Independent Training pending-run dialog"),
-    'Choose Career Mode':   _pending("Choose Career Mode (trainer-event failsafe)"),
-    'Start Event':          _pending("Event start dialog"),
+    # The most consequential clicks the bot makes; see start.py.
+    'Final Confirmation':   start.script_final_confirmation,
+    'Independent Training': lambda ctx: start.script_independent_training_pending(
+        ctx, getattr(getattr(ctx, 'career', None), 'dialog_header_pos',
+                     ((0, 0), (0, 0)))),
+
+    # -- the trainer-event failsafe ------------------------------------------
+    # Confirm on the event dialog is a one-way door into an event career, so
+    # 'Start Event' always backs out, and 'Choose Career Mode' verifies the
+    # Normal Mode switch took before it confirms.
+    'Choose Career Mode': start.script_choose_career_mode,
+    'Start Event': lambda ctx: _escape(
+        ctx, "Event start dialog - backing out to keep the loop on Normal Mode"),
 
     # -- the race agenda picker ----------------------------------------------
     # One state machine across three screens; see agenda.py. The phase it runs
