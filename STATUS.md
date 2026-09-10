@@ -57,10 +57,17 @@ way, and for the rules any new handler has to respect.
         minute rather than every pass; and the training-log close clicks once
         and resets the countdown log
 
+- [x] `uma_it/agenda.py` and `uma_it/parse.py` — the slot-1 picker, a state
+      machine across three screens, plus the screen-reading helpers it needs
+      — `check_agenda.py`: 25 assertions, most of them negative. An unreadable
+        scrollbar loads nothing and scrolls to look again; row 2 or row 5 on
+        top loads nothing; only a confirmed row 1 is clicked. An overwrite the
+        flow did not ask for is cancelled. Both budgets end a stuck flow by
+        closing rather than by loading something
+
 ## Next
 - [ ] `uma_it/start.py` — career start, career-mode failsafe, pending-run
       rescue. **The one part never run against the live game** (see DESIGN.md)
-- [ ] `uma_it/agenda.py` — the slot-1 picker; read the scrollbar (rule 2)
 - [ ] Enter and collect handlers — ~300 lines
 - [ ] `main.py` — device checks, scheduler, HTTP server
 - [ ] Web UI — IT-only; the parent project's task modal is 5,330 lines for a
@@ -83,7 +90,8 @@ against the parent project's 9,415 lines of module Python.
 | Manifest and screens (done) | 240 |
 | Router and fallback (done) | 330 |
 | Countdown and results (done) | 90 |
-| Start and agenda | ~380 |
+| Agenda picker and parse helpers (done) | 320 |
+| Start | ~210 |
 
 ## Checks
 
@@ -115,7 +123,11 @@ py -3.10 check_dialogs.py
 py -3.10 check_career.py
 ```
 
-All seven exit non-zero on failure. Run them after touching anything under
+```bash
+py -3.10 check_agenda.py
+```
+
+All eight exit non-zero on failure. Run them after touching anything under
 `uma_it/` or `bot/`.
 
 ## Unresolved: do the Skip presses matter?

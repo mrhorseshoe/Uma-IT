@@ -40,6 +40,7 @@ from bot.recog.ocr import ocr_line, find_similar_text
 from bot.base.task import TaskStatus
 import bot.base.log as logger
 
+from uma_it import agenda
 from uma_it.asset.template import UI_INFO, REF_NEXT
 from uma_it.asset.dialog_titles import ALL_TITLES
 from uma_it.asset.point import (
@@ -241,9 +242,12 @@ DIALOGS = {
     'Start Event':          _pending("Event start dialog"),
 
     # -- the race agenda picker ----------------------------------------------
-    'Agenda':     _pending("Agenda editor"),
-    'My Agendas': _pending("My Agendas list"),
-    'Overwrite':  _pending("Agenda overwrite prompt"),
+    # One state machine across three screens; see agenda.py. The phase it runs
+    # on is set by the Final Confirmation handler, which clicks Edit to start
+    # the flow.
+    'Agenda':     agenda.script_agenda,
+    'My Agendas': agenda.script_my_agendas,
+    'Overwrite':  agenda.script_agenda_overwrite,
 
     # -- connectivity, which can interrupt any screen ------------------------
     'Network Error':    _tap(NETWORK_ERROR_CONFIRM, "Network Error - confirming"),

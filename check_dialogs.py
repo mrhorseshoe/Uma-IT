@@ -36,7 +36,7 @@ class FakeCtrl:
         self.clicks = []
 
     def click_by_point(self, point):
-        self.clicks.append(getattr(point, 'click_point_name', point))
+        self.clicks.append(getattr(point, 'desc', point))
 
     def click(self, x, y, name):
         self.clicks.append((x, y, name))
@@ -61,7 +61,7 @@ def route(title, **settings):
     return ctx
 
 
-NAME = lambda p: getattr(p, 'click_point_name', p)
+NAME = lambda p: getattr(p, 'desc', p)
 
 print("screens the parent cleared blindly, now named")
 for title in ('Perks', 'Borrow Card', 'Follow Trainer', 'Notices'):
@@ -102,9 +102,30 @@ check("  and lets the game choose otherwise",
 
 print("\ncareer-start dialogs whose handlers are not written")
 for title in ('Final Confirmation', 'Independent Training', 'Choose Career Mode',
-              'Start Event', 'Agenda', 'My Agendas', 'Overwrite'):
+              'Start Event'):
     ctx = route(title)
     check(f"{title!r} stays still", ctx.ctrl.clicks == [], str(ctx.ctrl.clicks))
+
+print("\nthe agenda titles reach the picker")
+# What the picker then does is check_agenda.py's business. This pins only that
+# the router hands these three to it, rather than clearing them like a stray
+# dialog - which would abandon the flow mid-way and start the run on whatever
+# schedule the game happened to have.
+import uma_it.agenda as agenda_mod
+
+reached = []
+for title, fn in (('Agenda', 'script_agenda'),
+                  ('My Agendas', 'script_my_agendas'),
+                  ('Overwrite', 'script_agenda_overwrite')):
+    original = dialogs.DIALOGS[title]
+    dialogs.DIALOGS[title] = lambda _ctx, _t=title: reached.append(_t)
+    route(title)
+    dialogs.DIALOGS[title] = original
+    check(f"{title!r} is routed to agenda.py",
+          getattr(original, '__module__', '') == agenda_mod.__name__,
+          getattr(original, '__module__', '?'))
+check("  and all three were dispatched",
+      reached == ['Agenda', 'My Agendas', 'Overwrite'], str(reached))
 
 print("\nan unknown title")
 ctx = route('Qwerty Nonsense Title')
