@@ -1,0 +1,14 @@
+# runtime state - anything a user should receive lives in resource/
+userdata/
+screenshot/
+*.log
+debug_*.log
+
+# python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# scratch
+scripts/
