@@ -28,10 +28,20 @@ way, and for the rules any new handler has to respect.
         parent-project payloads all build; a finished run increments
         `loops_done` and the increment survives the trip
 
+- [x] `uma_it/manifest.py` and `uma_it/screens.py` — the app registers, the
+      22-screen scan list is wired, and `build_task` / `build_context` are
+      reachable through the executor's own lookup path
+      — `check_manifest.py`: registration resolves under the name `build_task`
+        stamps, the dispatch key matches the task type, no screen is scanned
+        from outside this project, no two screens share a name, and an
+        unhandled screen warns instead of raising
+
 ## Next
-- [ ] `uma_it/manifest.py` — app registration and the screen -> handler table
+
+- [ ] `uma_it/dialogs.py` — the title router, matching at 0.8 only. Also the
+      `NOT_FOUND_UI` fallback, which the app cannot run without: several
+      screens on this path are advanced only by that blind click
 - [ ] `uma_it/career.py` — the countdown handler; clicks nothing (rule 3)
-- [ ] `uma_it/dialogs.py` — the title router, matching at 0.8 only
 - [ ] `uma_it/start.py` — career start, career-mode failsafe, pending-run
       rescue. **The one part never run against the live game** (see DESIGN.md)
 - [ ] `uma_it/agenda.py` — the slot-1 picker; read the scrollbar (rule 2)
@@ -54,7 +64,8 @@ against the parent project's 9,415 lines of module Python.
 | Parse helpers, core | ~180 |
 | Task + context (done) | 300 |
 | Hooks | ~120 |
-| Router, start, agenda, career, manifest | ~1,040 |
+| Manifest and screens (done) | 240 |
+| Router, start, agenda, career | ~800 |
 
 ## Checks
 
@@ -74,8 +85,27 @@ py -3.10 check_engine.py
 py -3.10 check_task.py
 ```
 
-All four exit non-zero on failure. Run them after touching anything under
+```bash
+py -3.10 check_manifest.py
+```
+
+All five exit non-zero on failure. Run them after touching anything under
 `uma_it/` or `bot/`.
+
+## Unresolved: do the Skip presses matter?
+
+The parent runs `after_hook` on every frame, and part of it presses the game's
+Skip buttons. They may be what dismisses the result animations at the end of a
+career, or they may never fire on this path. `before_hook` and `apply_rules`
+are settled — both are provably inert for an Independent Training task in LOOP
+mode — but this one is not, and the hooks are wired to `None` until it is.
+
+**The 26 careers' logs cannot answer it.** Clicks log at DEBUG
+(`click >> <name>` in `bot/conn/u2_ctrl.py`) and those logs are INFO, so the
+absence of "Skip" in them is not evidence of anything.
+
+Settle it by running one career on the parent project at DEBUG and grepping for
+`click >> Skip`. Do that before the first live run here.
 
 ## Known no-ops, deliberately left
 

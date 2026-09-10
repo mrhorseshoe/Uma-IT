@@ -36,4 +36,9 @@ CULTIVATE_LEVEL_RESULT = UI("CULTIVATE_LEVEL_RESULT", [template.UI_CULTIVATE_LEV
 FACTOR_RECEIVE = UI("FACTOR_RECEIVE", [template.UI_FACTOR_RECEIVE], [template.UI_FACTOR_REROLL])
 FACTOR_REROLL = UI("FACTOR_REROLL", [template.UI_FACTOR_REROLL], [])
 HISTORICAL_RATING_UPDATE = UI("HISTORICAL_RATING_UPDATE", [template.UI_HISTORICAL_RATING_UPDATE], [])
-SCENARIO_RATING_UPDATE = UI("HISTORICAL_RATING_UPDATE", [template.UI_SCENARIO_RATING_UPDATE], [])
+# Named for itself, unlike in the parent project, where the label on the line
+# above was copied onto it. It is a distinct screen with its own template and
+# its own handler there, so every Scenario Rating Update frame logged as a
+# Historical one. A ui_name is a label, not calibration; fixing it costs
+# nothing and stops the logs lying.
+SCENARIO_RATING_UPDATE = UI("SCENARIO_RATING_UPDATE", [template.UI_SCENARIO_RATING_UPDATE], [])
