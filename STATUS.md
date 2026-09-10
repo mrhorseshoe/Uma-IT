@@ -48,8 +48,16 @@ way, and for the rules any new handler has to respect.
         deliberately leaves alone click nothing; unwritten handlers stay still;
         an unknown title still gets the load-bearing fallback click
 
+- [x] `uma_it/career.py` — the countdown handler and the training-log close.
+      Fifty of a career's fifty-two minutes are the first of these, and its
+      whole job is to do nothing correctly
+      — `check_career.py`: 12 assertions. It clicks nothing on a readable
+        frame, an unreadable one, an OCR that raises, a missing screen and a
+        context with no run state; it sleeps between passes; it logs on the
+        minute rather than every pass; and the training-log close clicks once
+        and resets the countdown log
+
 ## Next
-- [ ] `uma_it/career.py` — the countdown handler; clicks nothing (rule 3)
 - [ ] `uma_it/start.py` — career start, career-mode failsafe, pending-run
       rescue. **The one part never run against the live game** (see DESIGN.md)
 - [ ] `uma_it/agenda.py` — the slot-1 picker; read the scrollbar (rule 2)
@@ -74,7 +82,8 @@ against the parent project's 9,415 lines of module Python.
 | Hooks | ~120 |
 | Manifest and screens (done) | 240 |
 | Router and fallback (done) | 330 |
-| Start, agenda, career | ~470 |
+| Countdown and results (done) | 90 |
+| Start and agenda | ~380 |
 
 ## Checks
 
@@ -102,7 +111,11 @@ py -3.10 check_manifest.py
 py -3.10 check_dialogs.py
 ```
 
-All six exit non-zero on failure. Run them after touching anything under
+```bash
+py -3.10 check_career.py
+```
+
+All seven exit non-zero on failure. Run them after touching anything under
 `uma_it/` or `bot/`.
 
 ## Unresolved: do the Skip presses matter?

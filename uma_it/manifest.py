@@ -17,7 +17,8 @@ from bot.base.manifest import AppManifest
 from bot.base.resource import NOT_FOUND_UI, UI
 import bot.base.log as logger
 
-from uma_it.asset.ui import INFO
+from uma_it.asset.ui import INFO, INDEPENDENT_TRAINING_WAIT, INDEPENDENT_TRAINING_RESULTS
+from uma_it import career
 from uma_it.context import build_context
 from uma_it.dialogs import script_dialog, script_not_found_ui
 from uma_it.screens import scan_ui_list
@@ -47,9 +48,9 @@ script_dicts: Dict[UmaItTaskType, Dict[UI, Callable]] = {
         # CULTIVATE_FOLLOW_SUPPORT_CARD_SELECT: ...,
         # CULTIVATE_FINAL_CHECK: ...,
 
-        # the run itself
-        # INDEPENDENT_TRAINING_WAIT: career.script_wait,
-        # INDEPENDENT_TRAINING_RESULTS: ...,
+        # the run itself - fifty of a career's fifty-two minutes
+        INDEPENDENT_TRAINING_WAIT: career.script_wait,
+        INDEPENDENT_TRAINING_RESULTS: career.script_results,
 
         # collecting the result
         # CULTIVATE_RESULT / _1 / _2, CULTIVATE_FINISH, CULTIVATE_LEVEL_RESULT,
