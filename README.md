@@ -25,13 +25,25 @@ because something once broke.
 
 ## Running it
 
+Double-click `start.bat`, or:
+
 ```bash
 py -3.10 main.py
 ```
 
+It must be `py -3.10`, not `python`. The packages live in system Python 3.10's
+site-packages, and a plain `python` picks up whatever is first on PATH - which
+fails at `import cv2` with a message that says nothing about why. `start.bat`
+handles that, and says so plainly if 3.10 is missing.
+
 Pick the emulator when asked; the dashboard opens on http://127.0.0.1:8071.
 It is a single HTML file with no build step - edit `public/index.html` and
 reload.
+
+**Starting the process starts the loop.** If a saved task restores and there is
+no recorded scheduler state, the scheduler starts - which is what lets the loop
+survive the soft restart it performs after every career. To restart without
+running a career, stop it from the dashboard once it is up.
 
 ## Relationship to UAT-Global-Server
 
