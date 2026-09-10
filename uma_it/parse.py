@@ -263,7 +263,11 @@ def find_support_card(ctx, img):
             continue
 
         title = ocr_line(name_img)
-        if SequenceMatcher(None, title, detail.follow_support_card_name).ratio() > 0.7:
+        score = SequenceMatcher(None, title, detail.follow_support_card_name).ratio()
+        if score > 0.7:
+            log.info(f"Borrow list: matched {title!r} to "
+                     f"{detail.follow_support_card_name!r} at {score:.2f}, "
+                     f"level {digits} - taking it")
             ctx.ctrl.click(match_result.center_point[0],
                            match_result.center_point[1] - 75,
                            f"Borrow {detail.follow_support_card_name} (level {digits})")

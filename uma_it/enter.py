@@ -179,11 +179,20 @@ def script_extend_umamusume_select(ctx):
 
 
 def script_support_card_select(ctx):
-    """The support card deck. An empty borrow slot means go and fill it."""
+    """The support card deck. An empty borrow slot means go and fill it.
+
+    Logged either way. Without it there is no record of whether the wanted card
+    was borrowed or the slot was simply already full from the last career, and
+    those look identical from outside.
+    """
     if image_match(ctx.ctrl.get_screen(to_gray=True),
                    REF_CULTIVATE_SUPPORT_CARD_EMPTY).find_match:
+        log.info(f"Support deck: borrow slot empty - looking for "
+                 f"{ctx.task.detail.follow_support_card_name!r} "
+                 f"at level {ctx.task.detail.follow_support_card_level}+")
         ctx.ctrl.click_by_point(TO_FOLLOW_SUPPORT_CARD_SELECT)
         return
+    log.info("Support deck: borrow slot already filled - going on")
     ctx.ctrl.click_by_point(TO_CULTIVATE_PREPARE_NEXT)
 
 
