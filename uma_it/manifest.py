@@ -17,7 +17,9 @@ from bot.base.manifest import AppManifest
 from bot.base.resource import NOT_FOUND_UI, UI
 import bot.base.log as logger
 
+from uma_it.asset.ui import INFO
 from uma_it.context import build_context
+from uma_it.dialogs import script_dialog, script_not_found_ui
 from uma_it.screens import scan_ui_list
 from uma_it.task import APP_NAME, UmaItTaskType, build_task
 
@@ -32,8 +34,9 @@ APP_ACTIVITY_NAME = "jp.co.cygames.umamusume_activity.UmamusumeActivity"
 # not written yet; see STATUS.md for the order they are being done in.
 script_dicts: Dict[UmaItTaskType, Dict[UI, Callable]] = {
     UmaItTaskType.CAREER: {
-        # every dialog with the green diagonal header
-        # INFO: dialogs.script_dialog,
+        # Every dialog with the green diagonal header, which on this path is
+        # most frames. The router dispatches on the OCR'd title.
+        INFO: script_dialog,
 
         # entering a career
         # MAIN_MENU: ...,
@@ -55,10 +58,9 @@ script_dicts: Dict[UmaItTaskType, Dict[UI, Callable]] = {
         # optional: CULTIVATE_LEARN_SKILL, CONFIRMATION_LEARNSKILL_BUTTON,
         # FACTOR_RECEIVE, FACTOR_REROLL
 
-        # NOT_FOUND_UI: the blind fallback. It must exist before the app is
-        # run: with no entry the executor does nothing on an unrecognised
-        # frame, and several screens on this path are only ever advanced by
-        # that fallback's click.
+        # The blind fallback, for a frame matching no screen at all. Several
+        # screens on this path are advanced only by its corner click.
+        NOT_FOUND_UI: script_not_found_ui,
     }
 }
 

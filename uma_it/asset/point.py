@@ -52,3 +52,14 @@ HISTORICAL_RATING_UPDATE_CONFIRM = ClickPoint(ClickPointType.CLICK_POINT_TYPE_CO
 SCENARIO_RATING_UPDATE_CONFIRM = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(360, 1115), "Historical Rating Update - Next Page", None)
 STORY_REWARDS_COLLECTED_CLOSE = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(360, 1180), "Story Rewards Collected - Close", None)
 ESCAPE = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(5, 715), "escape", None)
+
+# --- dialogs that only script_info handled in the parent ------------------
+# Not reachable from any screen definition, which is why they arrive after the
+# 38 above. Both are copied verbatim; see uma_it/dialogs.py for what fires them.
+
+# The TP recovery confirm. Pressed only when the task authorises spending.
+TO_RECOVER_TP = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(520, 830), "Recover Training Points", None)
+
+# The 'Race Details' dialog's confirm. Rare on this path - three frames in 26
+# careers - but the parent clicks it, so this app does too.
+CULTIVATE_GOAL_RACE_INTER_3 = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(520,920), "Start Career Race - Confirm", None)

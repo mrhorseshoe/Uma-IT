@@ -19,8 +19,10 @@ act on. Deleting an entry here is not a cleanup - it re-opens that collision.
 Generated from the original project's TITLE table; do not hand-edit to trim.
 """
 
-# Titles this app dispatches on. Kept as data for the collision check below;
-# the actions live in uma_it/dialogs.py.
+# Titles this app dispatches on. This list must mirror the keys of
+# uma_it/dialogs.py's DIALOGS exactly - check_titles.py fails if it drifts.
+# Kept separate from it so this module has no imports and dialogs.py can read
+# ALL_TITLES from here without a cycle.
 OWNED_TITLES = [
     'Perks',
     'Borrow Card',
@@ -45,12 +47,16 @@ OWNED_TITLES = [
     'Data Update',
     'Data Download',
     'Date Changed',
+    'Confirm',
+    'Recover TP',
+    'Items Selected',
+    'Race Details',
+    'Auto Select',
 ]
 
 """Titles carried purely so they win their own frames. See the module
 docstring - these are load-bearing precisely because nothing acts on them."""
 DISTRACTOR_TITLES = [
-    'Race Details',
     'Rest & Outing Confirmation',
     'Rest & Recreation',
     'Try Again',
@@ -75,15 +81,11 @@ DISTRACTOR_TITLES = [
     'Skill Acquisition Confirmation',
     'Successfully Acquired Skill',
     'Target Achievement Count Insufficient',
-    'Confirm',
-    'Recover TP',
     'Factor Confirmation',
     'New Difficulty Unlocked',
     'Auto Formation',
     'Battle Confirmation',
     'Unmet Requirements',
-    'Items Selected',
-    'Auto Select',
     'Session Error',
     'areer Playthrough Difficulty Se',
 ]

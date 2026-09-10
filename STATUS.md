@@ -36,11 +36,19 @@ way, and for the rules any new handler has to respect.
         from outside this project, no two screens share a name, and an
         unhandled screen warns instead of raising
 
-## Next
+- [x] `uma_it/dialogs.py` — the title router and the blind fallback. 28 titles
+      with actions, 31 kept only so they win their own frames
+      — which titles get an action was decided by counting what actually
+        appears across the preceding careers, not by reading the parent's
+        table: `Recover TP` (332 frames), `Confirm` (112), `Items Selected`,
+        `Race Details` and `Auto Select` all occur and none was owned
+      — `check_dialogs.py`: 25 assertions driving the router with a fake
+        controller. The TP decision ends the career when `allow_recover_tp` is
+        0 and spends only when authorised; the two screens the parent
+        deliberately leaves alone click nothing; unwritten handlers stay still;
+        an unknown title still gets the load-bearing fallback click
 
-- [ ] `uma_it/dialogs.py` — the title router, matching at 0.8 only. Also the
-      `NOT_FOUND_UI` fallback, which the app cannot run without: several
-      screens on this path are advanced only by that blind click
+## Next
 - [ ] `uma_it/career.py` — the countdown handler; clicks nothing (rule 3)
 - [ ] `uma_it/start.py` — career start, career-mode failsafe, pending-run
       rescue. **The one part never run against the live game** (see DESIGN.md)
@@ -65,7 +73,8 @@ against the parent project's 9,415 lines of module Python.
 | Task + context (done) | 300 |
 | Hooks | ~120 |
 | Manifest and screens (done) | 240 |
-| Router, start, agenda, career | ~800 |
+| Router and fallback (done) | 330 |
+| Start, agenda, career | ~470 |
 
 ## Checks
 
@@ -89,7 +98,11 @@ py -3.10 check_task.py
 py -3.10 check_manifest.py
 ```
 
-All five exit non-zero on failure. Run them after touching anything under
+```bash
+py -3.10 check_dialogs.py
+```
+
+All six exit non-zero on failure. Run them after touching anything under
 `uma_it/` or `bot/`.
 
 ## Unresolved: do the Skip presses matter?
