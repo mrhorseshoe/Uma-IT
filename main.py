@@ -30,6 +30,17 @@ import sys
 import threading
 import time
 
+# Checked before the first third-party import, not inside main(). The packages
+# live in system Python 3.10's site-packages, so running this on any other
+# interpreter fails at `import cv2` with a bare ModuleNotFoundError that says
+# nothing about the actual cause. `python` on this machine is 3.14.
+if sys.version_info[:2] != (3, 10):
+    sys.exit(
+        f"\033[31mUma-IT needs Python 3.10; this is "
+        f"{sys.version.split()[0]}.\033[0m\n"
+        f"Its packages are installed in system Python 3.10, so run:\n\n"
+        f"    py -3.10 main.py\n")
+
 import cv2
 
 # Give OpenCV and the BLAS backends every core before anything imports them.
@@ -133,10 +144,6 @@ def main() -> int:
         acquire_instance_lock()
     except Exception:
         pass
-
-    if sys.version_info[:2] != (3, 10):
-        print("\033[33mWarning: this project expects Python 3.10; "
-              f"running {sys.version.split()[0]}\033[0m")
 
     configure_gpu()
 

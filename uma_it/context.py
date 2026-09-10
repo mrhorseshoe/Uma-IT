@@ -79,6 +79,13 @@ class CareerContext:
         self.manual_purchase_completed: bool = False
         self.manual_purchase_initiated: bool = False
 
+        # -- Home ------------------------------------------------------------
+        # Consecutive frames where the CAREER button was not found by colour.
+        # The first misses are the screen still transitioning after the button
+        # was already pressed, so they are waited out rather than clicked
+        # through.
+        self.career_button_misses: int = 0
+
         # -- restoring TP ----------------------------------------------------
         # Steps taken in the Recover TP flow, so an unrecognised screen gives
         # up rather than being retried into the click guard.

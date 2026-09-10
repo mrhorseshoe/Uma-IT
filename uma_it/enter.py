@@ -49,8 +49,15 @@ SCENARIO_TEMPLATES = {
 }
 
 # Where the CAREER button sits on Home, as a region to search rather than a
-# point to press.
+# point to press. Verified against a live Home capture: the search finds a
+# 146x47 blob at (543, 1112), which no shape filter rejects.
 CAREER_REGION = (380, 1020, 715, 1160)
+
+# How many consecutive misses to wait out before using the fixed point. A miss
+# is normally the screen mid-transition, and the fallback's value is covering a
+# button whose art has changed - which is not a transient condition, so it can
+# afford to wait.
+CAREER_MISSES_BEFORE_FALLBACK = 3
 
 # The carousel holds more scenarios than this app can start a run in, and it
 # opens wherever it was left, so swipe far enough to cycle it from any
@@ -72,6 +79,16 @@ def script_main_menu(ctx):
 
     CAREER is then located by colour, which keeps the button being pressed
     where it actually is rather than where it usually is.
+
+    That search works, contrary to a note carried in the parent claiming it
+    had "135 failures with no recorded success". It logs only its failures, and
+    both paths clicked under the same name, so the successes were invisible. A
+    DEBUG career on 10 Sep 2026 settled it from the tap coordinates: one Home
+    frame tapped (540, 1116), which is the search's own result, and the next -
+    two seconds later, mid-transition - warned and tapped the fixed point at
+    (548, 1083). The search succeeds; it just cannot see a button that is
+    currently being pressed. Successes are logged now, and the two clicks have
+    different names.
     """
     career = ctx.career
     if career.career_finished:
@@ -93,19 +110,26 @@ def script_main_menu(ctx):
         img = ctx.current_screen if ctx.current_screen is not None else ctx.ctrl.get_screen()
         btn = find_green_button(img, *CAREER_REGION)
         if btn:
-            ctx.ctrl.click(btn[0], btn[1], "Go to Scenario Selection")
+            career.career_button_misses = 0
+            log.info(f"Home: CAREER found by colour at {btn}")
+            ctx.ctrl.click(btn[0], btn[1], "CAREER (found by colour)")
             return
-        # In the parent this search has never once succeeded: 135 recorded
-        # failures and no evidence of a hit, so every Home transition was made
-        # on the fixed point below. That matters, because the colour search is
-        # the protection against the button's art rotating - and a protection
-        # that never fires is not protection. Report what was in the region so
-        # an empty mask can be told from a rejected blob.
+
+        # A miss here is usually the screen still transitioning after CAREER was
+        # already pressed - the button is not green while it is being tapped -
+        # so the first few are waited out rather than clicked through. Falling
+        # back immediately means a second, redundant tap on Home.
+        career.career_button_misses += 1
         why = describe_green_candidates(img, *CAREER_REGION)
+        if career.career_button_misses <= CAREER_MISSES_BEFORE_FALLBACK:
+            log.info(f"Home: CAREER not green yet "
+                     f"(miss {career.career_button_misses}) - waiting [{why}]")
+            return
         log.warning("Home: could not find the CAREER button by colour - "
                     f"using the fixed point [{why}]")
     except Exception as e:
         log.warning(f"Home: CAREER button search failed ({e}) - using the fixed point")
+    career.career_button_misses = 0
     ctx.ctrl.click_by_point(TO_CULTIVATE_SCENARIO_CHOOSE)
 
 

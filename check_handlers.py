@@ -19,6 +19,7 @@ import numpy as np
 
 import uma_it.enter as enter
 import uma_it.collect as collect
+from uma_it.parse import find_green_button as _real_find_green_button
 from uma_it.asset.point import (TO_CULTIVATE_SCENARIO_CHOOSE, TO_CULTIVATE_PREPARE_NEXT,
                                 TO_CULTIVATE_PREPARE_AUTO_SELECT,
                                 TO_CULTIVATE_PREPARE_INCLUDE_GUEST,
@@ -74,19 +75,62 @@ class FakeCtx:
 
 MATCH = lambda hit: (lambda *_a, **_k: type('M', (), {'find_match': hit})())
 
-print("Home")
-enter.find_green_button = lambda *_a: (545, 1085)
+print("Home, against real pixels")
+# The stubs below check the decision; this checks the search itself, on the
+# CAREER region of an actual Home frame. It pins the region and the colour
+# thresholds together - a change to either that stopped finding the button
+# would otherwise only show up on the game.
+import cv2
+
+_crop = cv2.imread('resource/uma_it/fixture/home_career_region.png')
+check("the fixture loads", _crop is not None)
+if _crop is not None:
+    _found = _real_find_green_button(_crop, 0, 0, _crop.shape[1], _crop.shape[0])
+    check("the CAREER button is found in a real Home frame", _found is not None,
+          str(_found))
+    if _found:
+        # in full-frame coordinates, for comparison with the fixed point (545, 1085)
+        _abs = (enter.CAREER_REGION[0] + _found[0], enter.CAREER_REGION[1] + _found[1])
+        check("  and lands on the button, near the fixed point",
+              abs(_abs[0] - 545) < 40 and abs(_abs[1] - 1085) < 40, str(_abs))
+
+print("\nHome, with the search stubbed")
+enter.find_green_button = lambda *_a: (543, 1112)
 ctx = FakeCtx()
 enter.script_main_menu(ctx)
 check("clicks CAREER where the colour search found it",
-      ctx.ctrl.clicks == [(545, 1085, "Go to Scenario Selection")], str(ctx.ctrl.clicks))
+      ctx.ctrl.clicks == [(543, 1112, "CAREER (found by colour)")], str(ctx.ctrl.clicks))
+check("  under a name that distinguishes it from the fallback",
+      "colour" in ctx.ctrl.clicks[0][2])
 
+# A miss is normally the screen mid-transition after CAREER was already
+# pressed, so falling back immediately means a second, redundant tap on Home.
+# That is what the parent does, and it is why its logs show a warning two
+# seconds after a successful press.
 enter.find_green_button = lambda *_a: None
 enter.describe_green_candidates = lambda *_a, **_k: "mask empty"
 ctx = FakeCtx()
+for i in range(enter.CAREER_MISSES_BEFORE_FALLBACK):
+    enter.script_main_menu(ctx)
+check("the first misses wait rather than clicking", ctx.ctrl.clicks == [],
+      str(ctx.ctrl.clicks))
+check("  and are counted",
+      ctx.career.career_button_misses == enter.CAREER_MISSES_BEFORE_FALLBACK,
+      str(ctx.career.career_button_misses))
+
 enter.script_main_menu(ctx)
-check("falls back to the fixed point when the search fails",
+check("falls back to the fixed point once the misses persist",
       ctx.ctrl.clicks == [NAME(TO_CULTIVATE_SCENARIO_CHOOSE)], str(ctx.ctrl.clicks))
+check("  and resets the counter", ctx.career.career_button_misses == 0,
+      str(ctx.career.career_button_misses))
+
+# A success after a miss must clear the count, or a run of unlucky frames
+# spread across a career would eventually trip the fallback for no reason.
+enter.find_green_button = lambda *_a: (543, 1112)
+ctx = FakeCtx(career_state={'career_button_misses': 2})
+enter.script_main_menu(ctx)
+check("a success clears earlier misses", ctx.career.career_button_misses == 0,
+      str(ctx.career.career_button_misses))
 
 ctx = FakeCtx(career_state={'career_finished': True})
 enter.script_main_menu(ctx)

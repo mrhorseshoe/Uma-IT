@@ -131,6 +131,19 @@ way, and for the rules any new handler has to respect.
         spending rules, and that an unrecognised screen gives up rather than
         being retried into the click guard
 
+- [x] The CAREER colour search — it was never broken. The parent's note that it
+      had "135 failures with no recorded success" was an artifact of logging
+      only failures, with both paths clicking under the same name
+      — settled from the DEBUG career's tap coordinates: one Home frame tapped
+        (540, 1116), the search's own result; the next, two seconds later and
+        mid-transition, warned and tapped the fixed point (548, 1083)
+      — successes are logged now, the two clicks have different names, and a
+        miss waits a few frames instead of immediately making a second,
+        redundant tap on Home
+      — `check_handlers.py` runs the real search against a real Home frame
+        (`resource/uma_it/fixture/home_career_region.png`), so the region and
+        the colour thresholds are pinned together
+
 ## Next
 - [ ] A first live career on **this** app. `uma_it/start.py` has still never
       faced the game - the parent's equivalent has, so the logic is proven
