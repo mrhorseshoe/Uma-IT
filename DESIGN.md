@@ -68,7 +68,15 @@ to start at x >= 60. A blank-page rewrite of *code* is cheap and safe. A
 blank-page rewrite of *calibration* is expensive and buys nothing.
 
 **Written fresh — everything else.** The handlers, the dialog router, the task
-and context, the web UI. This is where the 75% cut comes from.
+and context, the dashboard. This is where the 75% cut comes from.
+
+The dashboard is the sharpest example. The parent's is a Vue 3 + Vite app whose
+task modal alone is 5,330 lines - 160 `data()` properties and 101 methods, most
+of them configuring a career this app does not play - and it loads Bootstrap
+and jQuery from a CDN, so it needs the internet to render a page about an
+emulator on the same machine. This one is a single 456-line HTML file with no
+build step, no framework and no network dependency. It exposes seven settings,
+which is what an Independent Training task actually has.
 
 ## Layout
 
@@ -97,6 +105,7 @@ uma_it/
   define.py           the scenario enum
   task.py             19 settings; everything that must survive a restart
   context.py          run state; everything that is expected not to
+public/index.html     the dashboard - one file, no build step
 check_assets.py       every template resolves and decodes
 check_titles.py       every owned dialog title wins its own frame
 check_engine.py       every engine module imports, and reaches back nowhere

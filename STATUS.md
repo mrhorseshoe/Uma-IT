@@ -94,9 +94,13 @@ way, and for the rules any new handler has to respect.
         really are dropped when the app is unknown, and that `main()` does it
         in the right order
 
+- [x] The dashboard — `public/index.html`, 456 lines, one file. No build step,
+      no framework, no CDN, and same-origin API calls
+      — `check_ui.py`: every path the page calls is a route the server serves,
+        every setting it sends is one `build_task` reads, every scenario option
+        maps to a real `ScenarioType`, and nothing is loaded from the network
+
 ## Next
-- [ ] Web UI — IT-only; the parent project's task modal is 5,330 lines for a
-      career mode this app does not play
 - [ ] Optional: skill buying (~450 lines), spark reroll (~180)
 
 ## Line budget
@@ -113,6 +117,7 @@ against the parent project's 9,415 lines of module Python. `uma_it/` is at **2,2
 | Task + context (done) | 300 |
 | Hooks | ~120 |
 | Manifest and screens (done) | 240 |
+| Dashboard (done) | 456 |
 | Router and fallback (done) | 330 |
 | Countdown and results (done) | 90 |
 | Agenda picker and parse helpers (done) | 320 |
@@ -164,7 +169,11 @@ py -3.10 check_handlers.py
 py -3.10 check_main.py
 ```
 
-All eleven exit non-zero on failure. Run them after touching anything under
+```bash
+py -3.10 check_ui.py
+```
+
+All twelve exit non-zero on failure. Run them after touching anything under
 `uma_it/` or `bot/`.
 
 ## Running it

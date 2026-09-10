@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uma-IT</title>
+<style>
+:root {
+  --bg: #0e1013;
+  --panel: #16191e;
+  --line: #23272e;
+  --text: #e6e8ea;
+  --muted: #8b929c;
+  --accent: #4ade80;
+  --accent-dim: #22c55e;
+  --warn: #fbbf24;
+  --bad: #f87171;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f7f8f9;
+    --panel: #ffffff;
+    --line: #e3e6ea;
+    --text: #14171a;
+    --muted: #656d78;
+    --accent: #16a34a;
+    --accent-dim: #15803d;
+  }
+}
+* { box-sizing: border-box; }
+/* The UA stylesheet's [hidden] rule loses to any class that sets display, so
+   .summary and .controls stayed visible when hidden was set on them. */
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 640px; margin: 0 auto; padding: 40px 20px 64px; }
+
+header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 28px; }
+h1 { font-size: 17px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+.sub { color: var(--muted); font-size: 13px; }
+#conn { margin-left: auto; font-size: 12px; color: var(--muted); display: flex;
+        align-items: center; gap: 6px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.dot.on { background: var(--accent); }
+.dot.off { background: var(--bad); }
+
+.card {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 20px; margin-bottom: 16px;
+}
+.card h2 {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--muted); margin: 0 0 16px;
+}
+
+.state { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+.state b { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+.state .tag {
+  font-size: 11px; padding: 3px 8px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--muted);
+}
+.metrics { display: flex; gap: 28px; margin-top: 18px; flex-wrap: wrap; }
+.metric .k { font-size: 11px; color: var(--muted); text-transform: uppercase;
+             letter-spacing: 0.06em; }
+.metric .v { font-size: 19px; font-variant-numeric: tabular-nums;
+             font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+
+.controls { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+button {
+  font: inherit; font-size: 13px; padding: 8px 15px; border-radius: 7px;
+  border: 1px solid var(--line); background: transparent; color: var(--text);
+  cursor: pointer; transition: border-color .12s, background .12s, opacity .12s;
+}
+button:hover:not(:disabled) { border-color: var(--muted); }
+button:disabled { opacity: .35; cursor: default; }
+button.primary { background: var(--accent-dim); border-color: var(--accent-dim);
+                 color: #fff; font-weight: 500; }
+button.primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+button.quiet { color: var(--muted); }
+button.danger:hover:not(:disabled) { border-color: var(--bad); color: var(--bad); }
+
+.field { display: flex; align-items: center; gap: 14px; padding: 9px 0;
+         border-bottom: 1px solid var(--line); }
+.field:last-of-type { border-bottom: 0; }
+.field label { flex: 1; font-size: 14px; }
+.field .hint { display: block; font-size: 12px; color: var(--muted); margin-top: 1px; }
+.field input[type=text], .field input[type=number], .field select {
+  font: inherit; font-size: 14px; background: var(--bg); color: var(--text);
+  border: 1px solid var(--line); border-radius: 7px; padding: 7px 10px;
+  min-width: 0;
+}
+.field input[type=text] { width: 210px; }
+.field input[type=number] { width: 86px; text-align: right;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+.field select { width: 210px; }
+input:focus, select:focus { outline: none; border-color: var(--accent-dim); }
+
+.switch { position: relative; width: 38px; height: 22px; flex: none; }
+.switch input { opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.switch span {
+  position: absolute; inset: 0; border-radius: 999px; background: var(--line);
+  transition: background .15s; pointer-events: none;
+}
+.switch span::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--muted); transition: transform .15s, background .15s;
+}
+.switch input:checked + span { background: var(--accent-dim); }
+.switch input:checked + span::after { transform: translateX(16px); background: #fff; }
+/* The input itself is transparent, so its focus ring would be invisible.
+   Put one on the part that is actually drawn. */
+.switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.summary { display: flex; flex-wrap: wrap; gap: 8px 28px; }
+.summary div { font-size: 13px; }
+.summary .k { color: var(--muted); }
+.empty { color: var(--muted); font-size: 14px; }
+
+pre#log {
+  margin: 0; max-height: 300px; overflow: auto; font-size: 12px; line-height: 1.55;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color: var(--muted); white-space: pre-wrap; word-break: break-word;
+}
+.row { display: flex; align-items: center; gap: 10px; }
+.row .grow { flex: 1; }
+#note { font-size: 12px; color: var(--muted); margin-top: 14px; min-height: 1em; }
+#note.bad { color: var(--bad); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Uma-IT</h1>
+  <span class="sub">Independent Training loop</span>
+  <span id="conn"><span class="dot" id="conn-dot"></span><span id="conn-text">connecting</span></span>
+</header>
+
+<section class="card">
+  <h2>Status</h2>
+  <div class="state">
+    <b id="state">—</b>
+    <span class="tag" id="tag" hidden></span>
+  </div>
+  <div class="metrics">
+    <div class="metric"><div class="k">Time left</div><div class="v" id="remaining">—</div></div>
+    <div class="metric"><div class="k">Runs done</div><div class="v" id="runs">—</div></div>
+    <div class="metric"><div class="k">Limit</div><div class="v" id="limit">—</div></div>
+  </div>
+  <div class="controls">
+    <button class="primary" id="start">Start</button>
+    <button id="finish">Stop after this run</button>
+    <button class="quiet" id="stop">Stop</button>
+  </div>
+  <div id="note"></div>
+</section>
+
+<section class="card">
+  <h2>Task</h2>
+  <div id="task-view">
+    <p class="empty" id="no-task">No task yet.</p>
+    <div class="summary" id="summary" hidden></div>
+    <div class="controls" id="task-actions" hidden>
+      <button id="edit">Edit</button>
+      <button class="quiet danger" id="delete">Delete</button>
+    </div>
+    <div class="controls" id="new-actions" hidden>
+      <button class="primary" id="new">Create task</button>
+    </div>
+  </div>
+
+  <form id="form" hidden>
+    <div class="field">
+      <label for="scenario">Scenario</label>
+      <select id="scenario">
+        <option value="4">Grand Concert</option>
+        <option value="3">Trackblazer</option>
+        <option value="1">URA Finale</option>
+        <option value="2">Aoharu Cup</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="card">Support card to borrow
+        <span class="hint">Must match the in-game name exactly — it is read off the screen</span>
+      </label>
+      <input type="text" id="card" placeholder="Wave of Gratitude">
+    </div>
+    <div class="field">
+      <label for="level">Minimum card level</label>
+      <input type="number" id="level" min="0" max="50" value="50">
+    </div>
+    <div class="field">
+      <label for="loops">Run limit
+        <span class="hint">0 runs until stopped</span>
+      </label>
+      <input type="number" id="loops" min="0" value="0">
+    </div>
+    <div class="field">
+      <label for="parents">Keep the last legacy
+        <span class="hint">Off runs the game's auto-select each career</span>
+      </label>
+      <span class="switch"><input type="checkbox" id="parents" checked><span></span></span>
+    </div>
+    <div class="field">
+      <label for="skills">Skip skill buying
+        <span class="hint">Skill buying is not implemented yet; turning this off finishes the career without it</span>
+      </label>
+      <span class="switch"><input type="checkbox" id="skills" checked><span></span></span>
+    </div>
+    <div class="field">
+      <label for="tp">Spend to restore TP
+        <span class="hint">Off fails a career instead of paying. On can spend carats.</span>
+      </label>
+      <span class="switch"><input type="checkbox" id="tp"><span></span></span>
+    </div>
+    <div class="controls">
+      <button type="submit" class="primary" id="save">Save task</button>
+      <button type="button" class="quiet" id="cancel">Cancel</button>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>
+    <span class="row"><span class="grow">Log</span></span>
+  </h2>
+  <pre id="log">—</pre>
+</section>
+
+</div>
+
+<script>
+"use strict";
+
+// Same origin, always. The parent project hardcoded an absolute base URL, so
+// serving the page anywhere but port 8071 silently talked to whatever bot was
+// on 8071 instead of the one serving the page.
+const api = (path, opts) => fetch(path, opts);
+
+const SCENARIOS = { 1: "URA Finale", 2: "Aoharu Cup", 3: "Trackblazer", 4: "Grand Concert" };
+const STATUS = { 1: "Pending", 2: "Running", 3: "Interrupted", 4: "Done", 5: "Failed",
+                 6: "Scheduled", 7: "Cancelled" };
+
+const $ = (id) => document.getElementById(id);
+let task = null;
+let editing = false;
+let noteTimer = null;
+
+function note(text, bad) {
+  const el = $("note");
+  el.textContent = text || "";
+  el.classList.toggle("bad", !!bad);
+  clearTimeout(noteTimer);
+  if (text) noteTimer = setTimeout(() => { el.textContent = ""; }, 4000);
+}
+
+function setConnected(ok) {
+  $("conn-dot").className = "dot " + (ok ? "on" : "off");
+  $("conn-text").textContent = ok ? "connected" : "no connection";
+}
+
+async function refresh() {
+  try {
+    const [status, state, tasks] = await Promise.all([
+      api("/action/bot/status").then((r) => r.json()),
+      api("/api/runtime-state").then((r) => r.json()),
+      api("/task").then((r) => r.json()),
+    ]);
+    setConnected(true);
+    task = Array.isArray(tasks) && tasks.length ? tasks[0] : null;
+    render(status, state);
+  } catch (e) {
+    setConnected(false);
+  }
+}
+
+function render(status, state) {
+  const it = (state && state.independent_training) || {};
+  const running = status.status === "running" || status.status === "finishing";
+
+  $("state").textContent = running
+    ? (it.active ? "Training" : "Running")
+    : status.status === "stopped" ? "Stopped" : status.status;
+
+  const tag = $("tag");
+  if (status.stop_after_run) {
+    tag.hidden = false;
+    tag.textContent = "stopping after this run";
+  } else if (task && task.task_status && STATUS[task.task_status] && !running) {
+    tag.hidden = false;
+    tag.textContent = STATUS[task.task_status].toLowerCase();
+  } else {
+    tag.hidden = true;
+  }
+
+  $("remaining").textContent = it.remaining || "—";
+  const d = task && task.detail;
+  $("runs").textContent = d ? (d.loops_done ?? 0) : "—";
+  $("limit").textContent = d ? (d.loop_count ? d.loop_count : "∞") : "—";
+
+  $("start").disabled = running || !task;
+  $("finish").disabled = !running || status.stop_after_run;
+  $("stop").disabled = !running;
+
+  if (!editing) renderTask();
+  if (task) loadLog(task.task_id);
+}
+
+function renderTask() {
+  $("form").hidden = true;
+  $("task-view").hidden = false;
+  $("no-task").hidden = !!task;
+  $("summary").hidden = !task;
+  $("task-actions").hidden = !task;
+  $("new-actions").hidden = !!task;
+  if (!task) return;
+
+  const d = task.detail || {};
+  $("summary").innerHTML = [
+    ["Scenario", SCENARIOS[d.scenario] || d.scenario],
+    ["Card", d.follow_support_card_name || "any"],
+    ["Min level", d.follow_support_card_level],
+    ["Legacy", d.use_last_parents ? "keep last" : "auto-select"],
+    ["Skills", d.skip_learn_skill ? "skipped" : "requested"],
+    ["TP", d.allow_recover_tp ? "may spend" : "never spend"],
+  ].map(([k, v]) => `<div><span class="k">${k}</span> ${v}</div>`).join("");
+}
+
+function openForm() {
+  editing = true;
+  const d = (task && task.detail) || {};
+  $("scenario").value = String(d.scenario ?? 4);
+  $("card").value = d.follow_support_card_name || "";
+  $("level").value = d.follow_support_card_level ?? 50;
+  $("loops").value = d.loop_count ?? 0;
+  $("parents").checked = d.use_last_parents ?? true;
+  $("skills").checked = d.skip_learn_skill ?? true;
+  $("tp").checked = !!d.allow_recover_tp;
+  $("task-view").hidden = true;
+  $("form").hidden = false;
+}
+
+function closeForm() {
+  editing = false;
+  $("form").hidden = true;
+  $("task-view").hidden = false;
+  renderTask();
+}
+
+async function saveTask(ev) {
+  ev.preventDefault();
+  const payload = {
+    scenario: Number($("scenario").value),
+    follow_support_card_name: $("card").value.trim(),
+    follow_support_card_level: Number($("level").value) || 0,
+    loop_count: Number($("loops").value) || 0,
+    // Carried forward so editing a task does not reset the run count.
+    loops_done: (task && task.detail && task.detail.loops_done) || 0,
+    use_last_parents: $("parents").checked,
+    skip_learn_skill: $("skills").checked,
+    // The engine reads this as a level, not a flag: 0 never spends, higher
+    // values authorise it, carats included.
+    allow_recover_tp: $("tp").checked ? 2 : 0,
+  };
+  $("save").disabled = true;
+  try {
+    if (task) {
+      await api("/task", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task_id: task.task_id }),
+      });
+    }
+    const res = await api("/task", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        app_name: "uma-it",
+        task_execute_mode: 3,
+        task_type: 1,
+        task_desc: "Training",
+        attachment_data: payload,
+      }),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    note("Task saved");
+    closeForm();
+    await refresh();
+  } catch (e) {
+    note("Could not save the task: " + e.message, true);
+  } finally {
+    $("save").disabled = false;
+  }
+}
+
+async function act(path, label) {
+  try {
+    const res = await api(path, { method: "POST" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    note(label);
+    await refresh();
+  } catch (e) {
+    note("Failed: " + e.message, true);
+  }
+}
+
+async function loadLog(taskId) {
+  try {
+    const res = await api("/log/" + encodeURIComponent(taskId));
+    const data = await res.json();
+    const lines = Array.isArray(data) ? data : (data && data.log) || [];
+    const el = $("log");
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
+    el.textContent = lines.length
+      ? lines.slice(-200).map((l) => (typeof l === "string" ? l : JSON.stringify(l))).join("\n")
+      : "Nothing logged yet.";
+    if (atBottom) el.scrollTop = el.scrollHeight;
+  } catch (e) {
+    /* the log is a convenience; never let it break the page */
+  }
+}
+
+$("start").onclick = () => act("/action/bot/start", "Started");
+$("stop").onclick = () => act("/action/bot/stop", "Stopping");
+$("finish").onclick = () => act("/action/bot/stop-after-run", "Will stop after this run");
+$("new").onclick = () => openForm();
+$("edit").onclick = () => openForm();
+$("cancel").onclick = () => closeForm();
+$("form").onsubmit = saveTask;
+$("delete").onclick = async () => {
+  if (!task) return;
+  try {
+    await api("/task", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task_id: task.task_id }),
+    });
+    note("Task deleted");
+    await refresh();
+  } catch (e) {
+    note("Could not delete the task: " + e.message, true);
+  }
+};
+
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>

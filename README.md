@@ -30,6 +30,8 @@ py -3.10 main.py
 ```
 
 Pick the emulator when asked; the dashboard opens on http://127.0.0.1:8071.
+It is a single HTML file with no build step - edit `public/index.html` and
+reload.
 
 ## Relationship to UAT-Global-Server
 
