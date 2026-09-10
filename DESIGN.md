@@ -143,7 +143,9 @@ None of these is obvious from reading the code. All are load-bearing.
 1. **Home is the bottom-nav Home tab, not the CAREER button.** That button's
    art rotates with in-game events and no single crop matches two rotations;
    twice in one week the old bot could not find Home at all. CAREER is then
-   located by colour search, not by template.
+   located by colour search, not by template — and that search works, verified
+   against a real Home frame and pinned by a fixture. The parent's claim that
+   it had never once succeeded came from logging only its failures.
 2. **The agenda is slot 1, and the scrollbar is read before clicking.** An
    unreadable scrollbar must *never* be treated as row 1 — that assumption ran
    a four-race agenda for fifteen careers without anyone noticing. Picking by
