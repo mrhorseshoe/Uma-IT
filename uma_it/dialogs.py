@@ -40,9 +40,10 @@ from bot.recog.ocr import ocr_line, find_similar_text
 from bot.base.task import TaskStatus
 import bot.base.log as logger
 
-from uma_it import agenda, start
+from uma_it import agenda, spark, start
 from uma_it.asset.template import UI_INFO, REF_NEXT
 from uma_it.asset.dialog_titles import ALL_TITLES
+from uma_it.parse import is_spark_selection_screen
 from uma_it.asset.point import (
     ESCAPE,
     CULTIVATE_FINISH_RETURN_CONFIRM,
@@ -297,12 +298,20 @@ def script_dialog(ctx):
         _escape(ctx, "Headerless dialog")
         return
 
+    # A reroll in flight owns its own dialogs, and they have to be judged by
+    # body text - the title dispatch below would click a point behind them.
+    # This also has to come before 'Confirm' reaches the TP handler, which
+    # would end the career over a reroll the run does not need.
+    career = getattr(ctx, 'career', None)
+    if career is not None and getattr(career, 'spark_reroll_phase', ''):
+        if spark.intercept_dialog(ctx, career.dialog_header_pos):
+            return
+
     title = find_similar_text(raw, ALL_TITLES, MATCH_THRESHOLD)
 
     # How many frames in a row this same title has been dispatched. Reset by
     # any other dialog, so it measures "this screen will not go away" rather
     # than a running total across the career.
-    career = getattr(ctx, 'career', None)
     if career is not None:
         if getattr(career, 'dialog_last_title', None) == title:
             career.dialog_repeat = getattr(career, 'dialog_repeat', 0) + 1
@@ -334,14 +343,27 @@ def script_not_found_ui(ctx):
     * The race-list ROI probe and the cultivation-result OCR heuristics
       ('rewards', 'bond level', 'total fans') - every result screen they guess
       at has a real template in `screens.py`, matched before this is reached.
-    * The spark-selection interception - belongs with the spark reroll handler,
-      which is not written. Anything reaching here while a reroll is in flight
-      gets the corner click, which is what the parent does when its own
-      heuristics miss.
 
-    What is kept is the part that earns its place: a visible Next button, then
-    the corner click that advances screens nobody has templated.
+    What is kept is the part that earns its place: the spark-selection
+    interception, a visible Next button, and the corner click that advances
+    screens nobody has templated.
     """
+    # The Spark Selection screen and the reroll animation have no template, so
+    # they land here. Intercept before the generic heuristics can click
+    # something on them.
+    career = getattr(ctx, 'career', None)
+    phase = getattr(career, 'spark_reroll_phase', '') if career else ''
+    if phase in ('reroll_clicked', 'selected') and ctx.current_screen is not None:
+        if is_spark_selection_screen(ctx.current_screen):
+            spark.handle_spark_selection(ctx)
+            return
+        if phase == 'reroll_clicked':
+            # most likely the reroll animation; tap a neutral spot to skip it
+            log.debug("Waiting for the Spark Selection screen")
+            ctx.ctrl.click_by_point(ESCAPE)
+            time.sleep(1)
+            return
+
     if ctx.current_screen is not None:
         try:
             img = cv2.cvtColor(ctx.current_screen, cv2.COLOR_BGR2GRAY)

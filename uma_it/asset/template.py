@@ -80,3 +80,7 @@ UI_SCENARIO_GRANDCONCERT = Template("SCENARIO_GRANDCONCERT", SCENARIO_TEMPLATE_P
 # The repeated label on each borrowable support card, used to find every card
 # on the screen before reading its level and title.
 REF_FOLLOW_SUPPORT_CARD_DETECT_LABEL = Template("FOLLOW_SUPPORT_CARD_DETECT_LABEL", REF_TEMPLATE_PATH)
+
+# The repeated label on each spark row, used to walk the list one row at a
+# time. Spark reroll only.
+REF_FACTOR_DETECT_LABEL = Template("FACTOR_DETECT_LABEL", REF_TEMPLATE_PATH)

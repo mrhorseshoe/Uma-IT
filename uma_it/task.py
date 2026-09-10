@@ -69,8 +69,13 @@ class TaskDetail:
     spark_reroll_targets: dict[str, int]
     spark_reroll_mode: str
     spark_reroll_min_stars: int
-    spark_reroll_use_carats: bool
     stop_at_spark_reroll: bool
+    # No `spark_reroll_use_carats`. In the parent that flag authorises a
+    # 66-line flow that drives the in-game shop to buy TP with carats, and it
+    # is not ported: carats are real currency, `allow_recover_tp` already
+    # defaults to refusing to spend, and a flag whose behaviour does not exist
+    # is worse than no flag. Declining the reroll keeps the original sparks,
+    # which costs nothing - the career is already over by then.
 
 
 class EndTaskReason(Enum):
@@ -167,7 +172,6 @@ def build_task(task_execute_mode: TaskExecuteMode, task_type: int,
     else:
         td.spark_reroll_targets = {}
     td.spark_reroll_mode = 'and' if data.get('spark_reroll_mode') == 'and' else 'or'
-    td.spark_reroll_use_carats = bool(data.get('spark_reroll_use_carats', False))
     td.stop_at_spark_reroll = bool(data.get('stop_at_spark_reroll', False))
 
     task = UmaItTask(app_name=APP_NAME,

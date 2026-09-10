@@ -36,8 +36,10 @@ from uma_it.asset.ui import (
     HISTORICAL_RATING_UPDATE,
     SCENARIO_RATING_UPDATE,
     RECEIVE_CUP,
+    FACTOR_RECEIVE,
+    FACTOR_REROLL,
 )
-from uma_it import career, collect, enter
+from uma_it import career, collect, enter, spark
 from uma_it.context import build_context
 from uma_it.dialogs import script_dialog, script_not_found_ui
 from uma_it.screens import scan_ui_list
@@ -82,9 +84,13 @@ script_dicts: Dict[UmaItTaskType, Dict[UI, Callable]] = {
         SCENARIO_RATING_UPDATE: collect.script_scenario_rating_update,
         RECEIVE_CUP: collect.script_receive_cup,
 
-        # Still unwritten, and both switched off in the default task:
+        # The end-of-career sparks screens. Reading them is unconditional;
+        # rerolling only happens when the task enables it and names a target.
+        FACTOR_RECEIVE: spark.script_factor_receive,
+        FACTOR_REROLL: spark.script_factor_reroll,
+
+        # Still unwritten, and switched off in the default task:
         # CULTIVATE_LEARN_SKILL, CONFIRMATION_LEARNSKILL_BUTTON (skill buying)
-        # FACTOR_RECEIVE, FACTOR_REROLL (spark reroll)
 
         # The blind fallback, for a frame matching no screen at all. Several
         # screens on this path are advanced only by its corner click.

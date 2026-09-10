@@ -100,8 +100,17 @@ way, and for the rules any new handler has to respect.
         every setting it sends is one `build_task` reads, every scenario option
         maps to a real `ScenarioType`, and nothing is loaded from the network
 
+- [x] Spark reroll — `uma_it/spark.py`, plus its screen reading in `parse.py`.
+      **21 of 22 screens now have a handler**
+      — `check_spark.py`: 25 assertions, most about when it decides *not* to
+        spend. A satisfied or unreadable roll is kept; running out of TP
+        mid-reroll aborts and keeps the original sparks instead of failing a
+        career that is already over
+
 ## Next
-- [ ] Optional: skill buying (~450 lines), spark reroll (~180)
+- [ ] Skill buying — the last screen without a handler
+- [ ] Expose spark reroll in the dashboard (targets are a name -> stars map,
+      so it needs more than a switch; usable over the API meanwhile)
 
 ## Line budget
 
@@ -173,7 +182,11 @@ py -3.10 check_main.py
 py -3.10 check_ui.py
 ```
 
-All twelve exit non-zero on failure. Run them after touching anything under
+```bash
+py -3.10 check_spark.py
+```
+
+All thirteen exit non-zero on failure. Run them after touching anything under
 `uma_it/` or `bot/`.
 
 ## Running it
