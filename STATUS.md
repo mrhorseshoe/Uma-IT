@@ -20,10 +20,15 @@ way, and for the rules any new handler has to respect.
       — `check_titles.py`: every owned title wins its own frame, no distractor
         is wrongly taken, and `'Final Confirmation'` resolves to itself
 
-## Next
+- [x] `uma_it/task.py`, `uma_it/context.py` and `uma_it/define.py` — 19
+      settings against the parent's 50, and settings separated from run state
+      so only what must persist does
+      — `check_task.py`: 30 assertions. A task round-trips through the engine's
+        real serializer with every setting intact; empty, null and
+        parent-project payloads all build; a finished run increments
+        `loops_done` and the increment survives the trip
 
-- [ ] `uma_it/context.py` and `uma_it/task.py` — 20 fields, not 50, and every
-      one of them restart-durable
+## Next
 - [ ] `uma_it/manifest.py` — app registration and the screen -> handler table
 - [ ] `uma_it/career.py` — the countdown handler; clicks nothing (rule 3)
 - [ ] `uma_it/dialogs.py` — the title router, matching at 0.8 only
@@ -43,11 +48,11 @@ against the parent project's 9,415 lines of module Python.
 
 | Piece | Estimate |
 |---|---|
-| Assets (done) | ~200 |
+| Assets (done) | 200 |
 | Enter/collect handlers | ~300 |
 | Blind fallback, IT-only | ~60 |
 | Parse helpers, core | ~180 |
-| Task + context | ~150 |
+| Task + context (done) | 300 |
 | Hooks | ~120 |
 | Router, start, agenda, career, manifest | ~1,040 |
 
@@ -65,8 +70,12 @@ py -3.10 check_titles.py
 py -3.10 check_engine.py
 ```
 
-All three exit non-zero on failure. Run them after touching anything under
-`uma_it/asset/` or `bot/`.
+```bash
+py -3.10 check_task.py
+```
+
+All four exit non-zero on failure. Run them after touching anything under
+`uma_it/` or `bot/`.
 
 ## Known no-ops, deliberately left
 

@@ -89,12 +89,38 @@ uma_it/
   career.py           the countdown handler (where the run spends its time)
   start.py            career start, career-mode failsafe, pending-run rescue
   agenda.py           the My Agendas slot-1 picker
-  task.py             task settings, deliberately few
-  context.py          per-run state, all of it restart-durable
+  define.py           the scenario enum
+  task.py             19 settings; everything that must survive a restart
+  context.py          run state; everything that is expected not to
 check_assets.py       every template resolves and decodes
 check_titles.py       every owned dialog title wins its own frame
 check_engine.py       every engine module imports, and reaches back nowhere
 ```
+
+## Settings and run state are separated, and only one of them persists
+
+The parent project copied every setting from the task onto its run context, so
+each one existed in both places. Adding a setting meant editing four files, and
+the copy step was the easy one to forget.
+
+Here nothing is copied:
+
+- **`task.detail`** holds the 19 settings. It is serialized with the task,
+  reloaded at boot, and survives the soft restart that happens after every
+  career. `loops_done` is only correct because it lives here.
+- **`ctx.career`** holds run state. It is built fresh per career and is
+  *expected* to be lost. Nothing in it may be the only copy of something that
+  has to outlive the run.
+
+Handlers read settings from `ctx.task.detail` and run state from `ctx.career`.
+The parent calls its equivalent `ctx.cultivate_detail`; code moved across will
+raise `AttributeError` rather than silently read a stale value.
+
+One wart: the engine's serializer still writes `ura_config: null` and
+`aoharu_config: null` into every payload, because it special-cases the parent's
+scenario config. `build_task` ignores unknown keys, so this round-trips
+harmlessly. Left alone rather than patched, since the serializer is shared
+engine code and the keys cost nothing.
 
 ## Rules this project inherits, each paid for in a live failure
 
