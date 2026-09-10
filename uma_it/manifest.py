@@ -135,12 +135,16 @@ def exec_script(ctx):
 #                     BTN_SKIP_SPEED_1), then does turn-by-turn work that
 #                     cannot apply here.
 #
-# The skip presses are UNRESOLVED and must be settled before the first live
-# run. They may be what dismisses the result animations at the end of a career.
-# The 26 careers' logs cannot answer it: clicks are logged at DEBUG
-# (`click >> <name>` in bot/conn/u2_ctrl.py) and those logs are INFO, so the
-# absence of "Skip" in them is not evidence. Settle it by running one career on
-# the parent project at DEBUG and grepping for `click >> Skip`.
+# The skip presses were the open question, and they are SETTLED: they never
+# fire on this path. Measured on 10 Sep 2026 by running one full career on the
+# parent project with file logging raised to DEBUG, so every click was recorded
+# by name. The career completed - 16:12 to 17:04, including the whole collect
+# phase where those presses would have to happen - and `click >> Skip` appears
+# zero times. Every click it did make is accounted for: 15 blind fallback
+# clicks, 3 Next buttons, and named handler clicks.
+#
+# So all three are inert here and None is correct. Do not re-open this without
+# new evidence; the experiment is cheap to repeat but it has been run.
 UmaItManifest = AppManifest(
     app_name=APP_NAME,
     app_package_name=APP_PACKAGE_NAME,

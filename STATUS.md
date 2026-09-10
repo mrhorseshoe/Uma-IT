@@ -132,8 +132,10 @@ way, and for the rules any new handler has to respect.
         being retried into the click guard
 
 ## Next
-- [ ] A first live career. `start.py` has still never faced the game, and the
-      `after_hook` Skip question is still open. Both need TP
+- [ ] A first live career on **this** app. `uma_it/start.py` has still never
+      faced the game - the parent's equivalent has, so the logic is proven
+      there, but this port has not been run. TP is no longer the blocker:
+      `allow_recover_tp` is on and restores from carats
 
 ## Line budget
 
@@ -238,20 +240,26 @@ Two things stand between this and a first career, and neither is more code -
 see below, and the note in DESIGN.md about `start.py` never having faced the
 live game.
 
-## Unresolved: do the Skip presses matter?
+## Settled: the Skip presses do not matter
 
-The parent runs `after_hook` on every frame, and part of it presses the game's
-Skip buttons. They may be what dismisses the result animations at the end of a
-career, or they may never fire on this path. `before_hook` and `apply_rules`
-are settled — both are provably inert for an Independent Training task in LOOP
-mode — but this one is not, and the hooks are wired to `None` until it is.
+`before_hook` and `after_hook` are wired to `None`, and that is now measured
+rather than assumed. `apply_rules` was provably inert (its rule table has one
+key, TEAM_TRIALS, and this app runs in LOOP mode) and `before_hook`'s branches
+return early for this path by explicit checks. The open one was `after_hook`,
+which presses the game's Skip buttons.
 
-**The 26 careers' logs cannot answer it.** Clicks log at DEBUG
-(`click >> <name>` in `bot/conn/u2_ctrl.py`) and those logs are INFO, so the
-absence of "Skip" in them is not evidence of anything.
+Run on 10 Sep 2026: one full career on the parent project with file logging
+raised to DEBUG, so `bot/conn/u2_ctrl.py` recorded every click by name. The
+career completed - 16:12 to 17:04, `TASK_STATUS_SUCCESS`, including the entire
+collect phase where those presses would have to happen.
 
-Settle it by running one career on the parent project at DEBUG and grepping for
-`click >> Skip`. Do that before the first live run here.
+**`click >> Skip` appears zero times.** The complete click inventory for the
+career was 15 blind fallback clicks, 5 result confirms, 5 preparation Next
+steps, 3 Next buttons, and single named clicks for each handler.
+
+Two things the same run confirmed in passing: the blind fallback is
+load-bearing (15 clicks), and the `Next` button probe kept in
+`script_not_found_ui` earns its place (3).
 
 ## Known no-ops, deliberately left
 
