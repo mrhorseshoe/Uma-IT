@@ -60,7 +60,10 @@ class TaskDetail:
     learn_skill_blacklist: list[str]
     learn_skill_only_user_provided: bool
     learn_skill_threshold: int
-    manual_purchase_at_end: bool
+    # No `manual_purchase_at_end`. It exists in the parent to pause the bot
+    # while the user buys skills by hand, through a flow that blocks the bot
+    # thread polling the web server, with a bare input() as its fallback.
+    # Neither the flow nor the flag is ported.
 
     # -- spark reroll, off by default ---------------------------------------
     # Targets map a spark name to its own minimum star count. Mode 'and'
@@ -157,7 +160,6 @@ def build_task(task_execute_mode: TaskExecuteMode, task_type: int,
     td.learn_skill_only_user_provided = bool(
         data.get('learn_skill_only_user_provided', False))
     td.learn_skill_threshold = _int(data.get('learn_skill_threshold'), 888, 0)
-    td.manual_purchase_at_end = bool(data.get('manual_purchase_at_end', False))
 
     td.spark_reroll_enabled = bool(data.get('spark_reroll_enabled', False))
     td.spark_reroll_min_stars = _int(data.get('spark_reroll_min_stars'), 3, 1, 3)

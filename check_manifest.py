@@ -76,7 +76,10 @@ check("no two screens share a name, bar the CULTIVATE_RESULT crops",
 print("\nhandlers")
 handled = set(script_dicts.get(UmaItTaskType.CAREER, {}))
 unhandled = [u.ui_name for u in manifest.ui_list if u not in handled]
-print(f"  {len(handled)} of {len(manifest.ui_list)} screens have a handler")
+# Counted against the scan list only: NOT_FOUND_UI has a handler but is not a
+# screen anyone scans for, so including it once read as "23 of 22".
+covered = len(manifest.ui_list) - len(unhandled)
+print(f"  {covered} of {len(manifest.ui_list)} scanned screens have a handler")
 if unhandled:
     print("  still to write: " + ", ".join(sorted(unhandled)))
 check("NOT_FOUND_UI has a fallback handler", NOT_FOUND_UI in handled,

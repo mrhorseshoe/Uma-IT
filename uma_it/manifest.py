@@ -38,8 +38,10 @@ from uma_it.asset.ui import (
     RECEIVE_CUP,
     FACTOR_RECEIVE,
     FACTOR_REROLL,
+    CULTIVATE_LEARN_SKILL,
+    CONFIRMATION_LEARNSKILL_BUTTON,
 )
-from uma_it import career, collect, enter, spark
+from uma_it import career, collect, enter, skills, spark
 from uma_it.context import build_context
 from uma_it.dialogs import script_dialog, script_not_found_ui
 from uma_it.screens import scan_ui_list
@@ -89,8 +91,9 @@ script_dicts: Dict[UmaItTaskType, Dict[UI, Callable]] = {
         FACTOR_RECEIVE: spark.script_factor_receive,
         FACTOR_REROLL: spark.script_factor_reroll,
 
-        # Still unwritten, and switched off in the default task:
-        # CULTIVATE_LEARN_SKILL, CONFIRMATION_LEARNSKILL_BUTTON (skill buying)
+        # Skill buying. Both crops lead to the same screen.
+        CULTIVATE_LEARN_SKILL: skills.script_learn_skill,
+        CONFIRMATION_LEARNSKILL_BUTTON: skills.script_learn_skill,
 
         # The blind fallback, for a frame matching no screen at all. Several
         # screens on this path are advanced only by its corner click.

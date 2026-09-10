@@ -107,15 +107,29 @@ way, and for the rules any new handler has to respect.
         mid-reroll aborts and keeps the original sparks instead of failing a
         career that is already over
 
+- [x] Skill buying — `uma_it/skills.py`, its screen reading in `parse.py`, the
+      default priority tiers in `const.py`, and the skill database shipped at
+      `resource/uma_it/skills.json`. **Every scanned screen now has a handler**
+      — `check_skills.py`: 17 assertions on what gets bought, and one on what
+        must not get edited - the buying pass trims the priority list as it
+        learns, and the task's own list is serialized, so the run works on a
+        copy
+
 ## Next
-- [ ] Skill buying — the last screen without a handler
-- [ ] Expose spark reroll in the dashboard (targets are a name -> stars map,
-      so it needs more than a switch; usable over the API meanwhile)
+- [ ] Expose spark reroll and the skill priority list in the dashboard. Both
+      are more than a switch - a name -> stars map and a list of tiers - and
+      both are usable over the API meanwhile. The seven settings the page does
+      show are the ones a run actually needs
+- [ ] A first live career. `start.py` has still never faced the game, and the
+      `after_hook` Skip question is still open. Both need TP
 
 ## Line budget
 
 Target is ~2,050 lines for the core and ~2,700 with both optional features,
-against the parent project's 9,415 lines of module Python. `uma_it/` is at **2,266**, with only the two optional features left.
+against the parent project's 9,415 lines of module Python. `uma_it/` is at **3,598** with both optional features in - over the 2,700
+estimate, and the overage is theirs: skill buying and spark reroll together are
+about 1,150 lines of screen reading in the parent and are not much smaller when
+moved. The core without them is ~2,300.
 
 | Piece | Estimate |
 |---|---|
@@ -186,7 +200,11 @@ py -3.10 check_ui.py
 py -3.10 check_spark.py
 ```
 
-All thirteen exit non-zero on failure. Run them after touching anything under
+```bash
+py -3.10 check_skills.py
+```
+
+All fourteen exit non-zero on failure. Run them after touching anything under
 `uma_it/` or `bot/`.
 
 ## Running it

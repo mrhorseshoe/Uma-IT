@@ -122,7 +122,7 @@ def get_sys_metrics():
     return _sys_metric_cache
 
 
-SKILLS_JSON_PATH = os.path.join('web', 'src', 'assets', 'umamusume_final_skills_fixed.json')
+SKILLS_JSON_PATH = os.path.join('resource', 'uma_it', 'skills.json')
 
 
 class AddSkillRequest(BaseModel):

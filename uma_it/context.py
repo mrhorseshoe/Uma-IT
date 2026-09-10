@@ -67,6 +67,12 @@ class CareerContext:
         self.last_countdown_log: str = ''
 
         # -- skill buying, only when the task enables it ---------------------
+        # A per-run copy of the task's priority list. The buying pass removes
+        # skills from it as they are learned, and the task's own list must not
+        # be what gets edited: it is serialized to disk, so mutating it would
+        # delete them from the user's saved preset permanently. None until the
+        # first pass copies it.
+        self.remaining_skills = None
         self.learn_skill_done: bool = False
         self.learn_skill_selected: bool = False
         self.final_skill_sweep_active: bool = False
@@ -83,6 +89,16 @@ class CareerContext:
         self.spark_reroll_result: dict = {}
         self.spark_reroll_abort_tries: int = 0
         self.spark_reroll_recover_tries: int = 0
+
+    def skills_wanted(self, task_detail):
+        """The priority list this run is still trying to buy.
+
+        Copied from the task on first use so the saved preset is never edited.
+        """
+        if self.remaining_skills is None:
+            self.remaining_skills = [list(x) for x in
+                                     (getattr(task_detail, 'learn_skill_list', None) or [])]
+        return self.remaining_skills
 
     def reset_skill_learn(self):
         """Forget skill-buying progress, for a screen that can be re-entered."""

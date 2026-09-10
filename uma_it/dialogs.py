@@ -50,6 +50,7 @@ from uma_it.asset.point import (
     CULTIVATE_FINISH_CONFIRM_AGAIN,
     CULTIVATE_RESULT_CONFIRM,
     CULTIVATE_LEARN_SKILL_CONFIRM_AGAIN,
+    CULTIVATE_LEARN_SKILL_DONE_CONFIRM,
     STORY_REWARDS_COLLECTED_CLOSE,
     NETWORK_ERROR_CONFIRM,
     TO_RECOVER_TP,
@@ -202,6 +203,9 @@ DIALOGS = {
                                  "Umamusume Details - confirming"),
     'Confirmation':         _tap(CULTIVATE_LEARN_SKILL_CONFIRM_AGAIN,
                                  "Confirmation - confirming"),
+    # Only seen when skill buying is on.
+    'Skills Learned':       _tap(CULTIVATE_LEARN_SKILL_DONE_CONFIRM,
+                                 "Skills Learned - confirming"),
     'Rewards Collected':    _tap(STORY_REWARDS_COLLECTED_CLOSE,
                                  "Rewards Collected - closing"),
     'Event Story Unlocked': _tap(STORY_REWARDS_COLLECTED_CLOSE,

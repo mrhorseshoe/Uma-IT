@@ -63,3 +63,6 @@ TO_RECOVER_TP = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coo
 # The 'Race Details' dialog's confirm. Rare on this path - three frames in 26
 # careers - but the parent clicks it, so this app does too.
 CULTIVATE_GOAL_RACE_INTER_3 = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(520,920), "Start Career Race - Confirm", None)
+
+# The 'Skills Learned' dialog's confirm. Skill buying only.
+CULTIVATE_LEARN_SKILL_DONE_CONFIRM = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE,None, Coordinate(359,832), "Skill Learning - Confirm Again", None)

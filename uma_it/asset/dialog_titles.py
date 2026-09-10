@@ -52,6 +52,7 @@ OWNED_TITLES = [
     'Items Selected',
     'Race Details',
     'Auto Select',
+    'Skills Learned',
 ]
 
 """Titles carried purely so they win their own frames. See the module
@@ -63,7 +64,6 @@ DISTRACTOR_TITLES = [
     'Earned Title',
     'Quick Mode Settings',
     'Recreation',
-    'Skills Learned',
     'Fan Count Below Target Race Requirement',
     'Outing',
     'Skip Confirmation',
