@@ -13,6 +13,8 @@ import os, sys
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.getcwd())
 
+import numpy as np
+
 import uma_it.dialogs as dialogs
 from uma_it.asset.point import (ESCAPE, TO_RECOVER_TP, CULTIVATE_FINISH_RETURN_CONFIRM,
                                 TO_CULTIVATE_PREPARE_NEXT)
@@ -35,6 +37,9 @@ class FakeCtrl:
     def __init__(self):
         self.clicks = []
 
+    def get_screen(self, to_gray=False):
+        return np.zeros((1280, 720, 3), np.uint8)
+
     def click_by_point(self, point):
         self.clicks.append(getattr(point, 'desc', point))
 
@@ -46,7 +51,7 @@ class FakeCtx:
     def __init__(self, **settings):
         self.ctrl = FakeCtrl()
         self.career = CareerContext()
-        self.current_screen = None
+        self.current_screen = np.zeros((1280, 720, 3), np.uint8)
         self.task = build_task(TaskExecuteMode.TASK_EXECUTE_MODE_LOOP, 1,
                                "check", None, settings)
         self.ended = []
@@ -87,10 +92,20 @@ check("accepts when the task authorises spending",
       ctx.ctrl.clicks == [NAME(TO_RECOVER_TP)], str(ctx.ctrl.clicks))
 check("  and does not end the career", ctx.ended == [], str(ctx.ended))
 
-print("\nscreens the parent knows and deliberately does not click")
-for title in ('Recover TP', 'Items Selected'):
-    ctx = route(title)
-    check(f"{title!r} clicks nothing", ctx.ctrl.clicks == [], str(ctx.ctrl.clicks))
+print("\nand the screen behind the prompt is driven, not left sitting")
+# This is where the parent stops: its handler for the Recover TP screen is
+# commented out, so its logs carry 332 'Recover TP' frames with nothing acting
+# on them. Here both the prompt and the screen go to the same stepper.
+ctx = route('Recover TP', allow_recover_tp=2)
+check("'Recover TP' with spending on takes a step",
+      ctx.ctrl.clicks == [NAME(TO_RECOVER_TP)], str(ctx.ctrl.clicks))
+ctx = route('Recover TP', allow_recover_tp=0)
+check("  and clicks nothing with spending off", ctx.ctrl.clicks == [],
+      str(ctx.ctrl.clicks))
+
+print("\na screen the parent knows and deliberately does not click")
+ctx = route('Items Selected')
+check("'Items Selected' clicks nothing", ctx.ctrl.clicks == [], str(ctx.ctrl.clicks))
 
 print("\nthe parents picker")
 ctx = route('Auto Select', use_last_parents=True)

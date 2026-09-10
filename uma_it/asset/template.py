@@ -84,3 +84,14 @@ REF_FOLLOW_SUPPORT_CARD_DETECT_LABEL = Template("FOLLOW_SUPPORT_CARD_DETECT_LABE
 # The repeated label on each spark row, used to walk the list one row at a
 # time. Spark reroll only.
 REF_FACTOR_DETECT_LABEL = Template("FACTOR_DETECT_LABEL", REF_TEMPLATE_PATH)
+
+# --- restoring TP ---------------------------------------------------------
+# The steps of the Recover TP flow, one screen each: the selection screen,
+# the two confirms (item and carats take different ones), and the two result
+# screens. TP_RECOVER_DRINK says a TP item is on offer at all.
+REF_RECOVER_TP_1 = Template("RECOVER_TP_1", REF_TEMPLATE_PATH)
+REF_RECOVER_TP_2 = Template("RECOVER_TP_2", REF_TEMPLATE_PATH)
+REF_RECOVER_TP_2_CARROT = Template("RECOVER_TP_2_CARROT", REF_TEMPLATE_PATH)
+REF_RECOVER_TP_3 = Template("RECOVER_TP_3", REF_TEMPLATE_PATH)
+REF_RECOVER_TP_3_CARROT = Template("RECOVER_TP_3_CARROT", REF_TEMPLATE_PATH)
+REF_TP_RECOVER_DRINK = Template("TP_RECOVER_DRINK", REF_TEMPLATE_PATH)

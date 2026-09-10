@@ -124,6 +124,13 @@ way, and for the rules any new handler has to respect.
         gets bought and nothing says why
       — `check_ui.py` now also pins the spark names against `parse.py`
 
+- [x] Restoring TP — `uma_it/tp.py`. `allow_recover_tp` above 0 now actually
+      restores rather than just accepting the prompt: a TP item if one is held,
+      carats otherwise, and never a chocolate item
+      — `check_tp.py`: 17 assertions, one per screen of the flow plus both
+        spending rules, and that an unrecognised screen gives up rather than
+        being retried into the click guard
+
 ## Next
 - [ ] A first live career. `start.py` has still never faced the game, and the
       `after_hook` Skip question is still open. Both need TP
@@ -209,7 +216,11 @@ py -3.10 check_spark.py
 py -3.10 check_skills.py
 ```
 
-All fourteen exit non-zero on failure. Run them after touching anything under
+```bash
+py -3.10 check_tp.py
+```
+
+All fifteen exit non-zero on failure. Run them after touching anything under
 `uma_it/` or `bot/`.
 
 ## Running it

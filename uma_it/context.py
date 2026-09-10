@@ -79,6 +79,11 @@ class CareerContext:
         self.manual_purchase_completed: bool = False
         self.manual_purchase_initiated: bool = False
 
+        # -- restoring TP ----------------------------------------------------
+        # Steps taken in the Recover TP flow, so an unrecognised screen gives
+        # up rather than being retried into the click guard.
+        self.tp_recover_tries: int = 0
+
         # -- spark reroll, only when the task enables it ---------------------
         # Phase: '' not evaluated yet -> 'keep' the first roll satisfied the
         # targets -> 'reroll_clicked' waiting for the comparison screen ->

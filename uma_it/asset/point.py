@@ -66,3 +66,13 @@ CULTIVATE_GOAL_RACE_INTER_3 = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDIN
 
 # The 'Skills Learned' dialog's confirm. Skill buying only.
 CULTIVATE_LEARN_SKILL_DONE_CONFIRM = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE,None, Coordinate(359,832), "Skill Learning - Confirm Again", None)
+
+# --- restoring TP --------------------------------------------------------
+# One click per step of the Recover TP flow. Carats and TP items take
+# different confirms, which is why there are two of each.
+USE_TP_DRINK = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(610, 320), "Use TP Drink", None)
+USE_CARROT_RECOVER_TP = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(610, 180), "Use Carrot to Recover TP", None)
+USE_CARROT_RECOVER_TP_ADD = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(520, 670), "Use Carrot +", None)
+USE_TP_DRINK_CONFIRM = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(525, 920), "Use TP Drink - Confirm", None)
+USE_CARROT_RECOVER_CONFIRM = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(525, 920), "Use Carrot - Confirm", None)
+USE_TP_DRINK_RESULT_CLOSE = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(360, 835), "Recovery Complete - Close", None)

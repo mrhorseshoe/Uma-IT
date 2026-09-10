@@ -40,7 +40,7 @@ from bot.recog.ocr import ocr_line, find_similar_text
 from bot.base.task import TaskStatus
 import bot.base.log as logger
 
-from uma_it import agenda, spark, start
+from uma_it import agenda, spark, start, tp
 from uma_it.asset.template import UI_INFO, REF_NEXT
 from uma_it.asset.dialog_titles import ALL_TITLES
 from uma_it.parse import is_spark_selection_screen
@@ -148,24 +148,30 @@ def _career_complete(ctx):
     time.sleep(1)
 
 
-def _tp_recovery_confirm(ctx):
-    """The dialog offering to restore TP, and the decision behind it.
+def _tp_recovery(ctx):
+    """The TP prompt, and the decision behind it.
 
     This is how the loop ends when the account runs dry: Independent Training
     costs 30 TP and regenerates far slower than a career consumes it, so after
-    a couple of dozen back-to-back runs this appears. `allow_recover_tp` at 0
-    fails the career rather than paying, which is the deliberate default -
-    higher values authorise spending carats, which are real currency.
+    a couple of dozen back-to-back runs this appears.
+
+    `allow_recover_tp` at 0 fails the career rather than paying. Above 0 the
+    restore actually runs - see `tp.py`, which prefers a TP item and falls back
+    to carats. The parent stops at accepting the prompt: its own handler for
+    the screen that follows is commented out, which is why 332 `Recover TP`
+    frames appear in its logs with nothing acting on them.
     """
-    allow = getattr(ctx.task.detail, 'allow_recover_tp', 0)
-    if not allow:
-        log.info("TP recovery offered - declining and failing the career "
+    if not tp.allowed(ctx):
+        log.info("TP restore offered - declining and failing the career "
                  "(allow_recover_tp is 0)")
         ctx.task.end_task(TaskStatus.TASK_STATUS_FAILED, EndTaskReason.TP_NOT_ENOUGH)
         return
-    log.info("TP recovery offered - accepting (allow_recover_tp is %s)", allow)
-    ctx.ctrl.click_by_point(TO_RECOVER_TP)
-    time.sleep(1)
+    career = getattr(ctx, 'career', None)
+    header = getattr(career, 'dialog_header_pos', None)
+    body = ''
+    if not tp.step(ctx, body, header):
+        log.warning("TP restore could not proceed - failing the career")
+        ctx.task.end_task(TaskStatus.TASK_STATUS_FAILED, EndTaskReason.TP_NOT_ENOUGH)
 
 
 def _auto_select(ctx):
@@ -219,8 +225,10 @@ DIALOGS = {
     # 'Confirm' is the decision. 'Recover TP' is the offer screen behind it,
     # which the parent knows and deliberately does not act on - its branch is
     # commented out - so neither does this.
-    'Confirm':      _tp_recovery_confirm,
-    'Recover TP':   _silent("TP recovery offer"),
+    # 'Confirm' is the prompt; 'Recover TP' is the screen behind it. Both go
+    # to the same stepper, which recognises whichever screen it is looking at.
+    'Confirm':      _tp_recovery,
+    'Recover TP':   _tp_recovery,
 
     # -- known, occurs, and the parent has no branch for it ------------------
     # Handled only in Team Trials mode there, which this app never runs.

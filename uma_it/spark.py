@@ -49,6 +49,7 @@ from uma_it.parse import (
     spark_rows_check,
     spark_scrollbar_ratio,
 )
+from uma_it import tp
 from uma_it.task import EndTaskReason
 
 log = logger.get_logger(__name__)
@@ -319,6 +320,12 @@ def intercept_dialog(ctx, header_pos) -> bool:
     bottom = header_pos[1][1]
     body = (ocr_line(img[bottom + 10:bottom + 260, 70:650]) or '').lower()
     log.info(f"Dialog during spark reroll (phase {phase!r}): {body[:80]!r}")
+
+    if any(k in body for k in CANT_AFFORD) and tp.allowed(ctx)             and phase == 'reroll_clicked':
+        # The task allows spending, so restore rather than abandon the reroll.
+        if tp.step(ctx, body, header_pos):
+            return True
+        log.warning("TP restore did not proceed - keeping the original sparks")
 
     if any(k in body for k in CANT_AFFORD):
         # Bail out fast rather than ping-ponging on TP dialogs. A career that
