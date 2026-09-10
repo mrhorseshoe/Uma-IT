@@ -14,10 +14,22 @@ screenshots, with taps sent through uiautomator2 over ADB.
 
 ## Status
 
-Early. The engine, the calibrated screen assets and the dialog title table are
-in place and verified; the handlers are being written. See
-[STATUS.md](STATUS.md) for the checklist and [DESIGN.md](DESIGN.md) for how the
-thing is put together and which rules exist because something once broke.
+Runnable, unproven. Every screen on the path has a handler bar the two optional
+features, and eleven check scripts cover the decisions. What has not happened
+is a career: the career-start path has never faced the live game, and running
+one needs TP the account does not currently have.
+
+See [STATUS.md](STATUS.md) for the checklist and what is still open, and
+[DESIGN.md](DESIGN.md) for how the thing is put together and which rules exist
+because something once broke.
+
+## Running it
+
+```bash
+py -3.10 main.py
+```
+
+Pick the emulator when asked; the dashboard opens on http://127.0.0.1:8071.
 
 ## Relationship to UAT-Global-Server
 

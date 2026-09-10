@@ -73,6 +73,8 @@ and context, the web UI. This is where the 75% cut comes from.
 ## Layout
 
 ```
+main.py               start-up order, and nothing else
+device.py             ADB discovery, recovery and health checks
 bot/                  vendored engine, unchanged
 resource/uma_it/
   ui/                 22 screen templates
@@ -89,6 +91,9 @@ uma_it/
   career.py           the countdown handler (where the run spends its time)
   start.py            career start, career-mode failsafe, pending-run rescue
   agenda.py           the My Agendas slot-1 picker
+  enter.py            Home through to the start dialog
+  collect.py          the result screens
+  parse.py            screen reading no template can do
   define.py           the scenario enum
   task.py             19 settings; everything that must survive a restart
   context.py          run state; everything that is expected not to

@@ -85,8 +85,16 @@ way, and for the rules any new handler has to respect.
         the finish screen still finishes a career when asked for skill buying,
         which this app has not written
 
+- [x] `main.py` and `device.py` — the app starts, registers, restores its task
+      list and serves the dashboard. **It is runnable**
+      — `check_main.py`: the ordering that fails silently. Registering the app
+        after restoring tasks does not raise; it empties the task list on the
+        first run, because the loader swallows the KeyError and the next save
+        writes the shortened list back. Both halves are pinned: that tasks
+        really are dropped when the app is unknown, and that `main()` does it
+        in the right order
+
 ## Next
-- [ ] `main.py` — device checks, scheduler, HTTP server
 - [ ] Web UI — IT-only; the parent project's task modal is 5,330 lines for a
       career mode this app does not play
 - [ ] Optional: skill buying (~450 lines), spark reroll (~180)
@@ -152,8 +160,27 @@ py -3.10 check_start.py
 py -3.10 check_handlers.py
 ```
 
-All ten exit non-zero on failure. Run them after touching anything under
+```bash
+py -3.10 check_main.py
+```
+
+All eleven exit non-zero on failure. Run them after touching anything under
 `uma_it/` or `bot/`.
+
+## Running it
+
+```bash
+py -3.10 main.py
+```
+
+Pick the emulator when asked; the dashboard opens on http://127.0.0.1:8071.
+The process soft-restarts itself after every career, relaunching `main.py` with
+`UAT_AUTORESTART=1`, which takes the device from `config.yaml` and opens no
+browser window.
+
+Two things stand between this and a first career, and neither is more code -
+see below, and the note in DESIGN.md about `start.py` never having faced the
+live game.
 
 ## Unresolved: do the Skip presses matter?
 
