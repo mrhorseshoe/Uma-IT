@@ -21,7 +21,10 @@ from bot.recog.ocr import ocr_line
 import bot.base.log as logger
 
 from uma_it.asset.template import (REF_FOLLOW_SUPPORT_CARD_DETECT_LABEL,
-                                   REF_FACTOR_DETECT_LABEL)
+                                   REF_FACTOR_DETECT_LABEL,
+                                   REF_SKILL_LIST_DETECT_LABEL,
+                                   REF_SKILL_LEARNED,
+                                   REF_HINT_LEVELS)
 
 log = logger.get_logger(__name__)
 

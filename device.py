@@ -343,8 +343,14 @@ def update_config(device_name):
         return False
 
 
-def run_health_checks():
-    """Run health checks after device selection"""
+def run_health_checks(device_id):
+    """Run health checks against the chosen device.
+
+    `device_id` is a parameter here, where the parent read it from a module
+    global its `__main__` block happened to set. Moving the function out of
+    main.py left that reference dangling, which failed as
+    `name 'selected_device' is not defined` on the first real run.
+    """
     print(" Running connection health checks...")
     
     # Test ADB connection - increased timeout to 20s
@@ -355,7 +361,7 @@ def run_health_checks():
         
         if result.returncode == 0:
             output = result.stdout
-            if selected_device in output:
+            if device_id in output:
                 if "offline" in output:
                      print("❌ ADB connection: OK but device is OFFLINE")
                      return False
@@ -374,7 +380,7 @@ def run_health_checks():
     retry_count = 3
     for attempt in range(retry_count):
         try:
-            result = subprocess.run([adb_path, "-s", selected_device, "shell", "echo", "test"], 
+            result = subprocess.run([adb_path, "-s", device_id, "shell", "echo", "test"], 
                                   capture_output=True, text=True, timeout=20)
             if result.returncode == 0:
                 print("✅ Device responsiveness: OK")
@@ -395,7 +401,7 @@ def run_health_checks():
                 return False
     
     # Test Umamusume detection
-    if check_umamusume_running(selected_device):
+    if check_umamusume_running(device_id):
         print("✅ Umamusume detection: OK")
     else:
         print("⚠️  Umamusume not running (this is OK)")

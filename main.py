@@ -99,11 +99,11 @@ def choose_device():
 
 def prepare_device(device_id: str) -> bool:
     """Health checks, with one recovery attempt, then a stabilisation pass."""
-    if not device.run_health_checks():
+    if not device.run_health_checks(device_id):
         print("⚠️  Health checks failed. Attempting auto-recovery...")
         device._soft_recover_device(device_id)
         print("🔄 Retrying health checks...")
-        if not device.run_health_checks():
+        if not device.run_health_checks(device_id):
             print("❌ Health checks failed again after recovery.")
             return False
     print("🔧 Finalizing device services…")

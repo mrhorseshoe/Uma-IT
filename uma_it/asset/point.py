@@ -5,7 +5,6 @@ against the live game at 720x1280.
 """
 from bot.base.common import Area, Coordinate
 from bot.base.point import ClickPoint, ClickPointType
-from uma_it.asset.template import *
 
 # cultivate
 TO_CULTIVATE_SCENARIO_CHOOSE = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(545, 1085), "Go to Scenario Selection", None)
