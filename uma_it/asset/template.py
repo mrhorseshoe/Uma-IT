@@ -65,3 +65,18 @@ REF_MOTIVATION_4 = Template("MOTIVATION_4", REF_TEMPLATE_PATH)
 REF_MOTIVATION_5 = Template("MOTIVATION_5", REF_TEMPLATE_PATH)
 MOTIVATION_LIST = [REF_MOTIVATION_1, REF_MOTIVATION_2, REF_MOTIVATION_3,
                    REF_MOTIVATION_4, REF_MOTIVATION_5]
+
+# --- entering a career ----------------------------------------------------
+SCENARIO_TEMPLATE_PATH = "/uma_it/scenario"
+
+# The scenario cards on the Scenario Select carousel. The carousel holds more
+# scenarios than this app can start a run in, so the handler swipes until the
+# one it wants matches rather than counting positions.
+UI_SCENARIO_URA = Template("SCENARIO_URA", SCENARIO_TEMPLATE_PATH)
+UI_SCENARIO_AOHARUHAI = Template("SCENARIO_AOHARUHAI", SCENARIO_TEMPLATE_PATH)
+UI_SCENARIO_TRACKBLAZER = Template("SCENARIO_TRACKBLAZER", SCENARIO_TEMPLATE_PATH)
+UI_SCENARIO_GRANDCONCERT = Template("SCENARIO_GRANDCONCERT", SCENARIO_TEMPLATE_PATH)
+
+# The repeated label on each borrowable support card, used to find every card
+# on the screen before reading its level and title.
+REF_FOLLOW_SUPPORT_CARD_DETECT_LABEL = Template("FOLLOW_SUPPORT_CARD_DETECT_LABEL", REF_TEMPLATE_PATH)

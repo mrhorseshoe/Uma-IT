@@ -1,0 +1,217 @@
+"""Getting from Home into a started career.
+
+Home -> Scenario Select -> trainee -> legacy -> borrow a support card -> the
+start dialog. `start.py` takes over from there.
+
+None of these screens carries a decision worth much: the game remembers the
+Training Focus and Prioritized Skills the user set by hand, so this is mostly
+pressing Next. The two that matter are Home, where the CAREER button moves,
+and the borrow screen, where the wrong card is a worse run.
+"""
+import time
+
+import bot.base.log as logger
+from bot.base.task import TaskStatus, EndTaskReason
+from bot.recog.image_matcher import image_match
+
+from uma_it.asset.point import (
+    TO_CULTIVATE_SCENARIO_CHOOSE,
+    TO_CULTIVATE_PREPARE_NEXT,
+    TO_CULTIVATE_PREPARE_AUTO_SELECT,
+    TO_CULTIVATE_PREPARE_INCLUDE_GUEST,
+    TO_CULTIVATE_PREPARE_CONFIRM,
+    TO_FOLLOW_SUPPORT_CARD_SELECT,
+    FOLLOW_SUPPORT_CARD_SELECT_REFRESH,
+    CULTIVATE_FINAL_CHECK_START,
+)
+from uma_it.asset.template import (
+    UI_SCENARIO_URA,
+    UI_SCENARIO_AOHARUHAI,
+    UI_SCENARIO_TRACKBLAZER,
+    UI_SCENARIO_GRANDCONCERT,
+    REF_CULTIVATE_SUPPORT_CARD_EMPTY,
+    REF_BORROW_CARD,
+)
+from uma_it.define import ScenarioType
+from uma_it.parse import (
+    find_green_button,
+    describe_green_candidates,
+    find_support_card,
+)
+
+log = logger.get_logger(__name__)
+
+SCENARIO_TEMPLATES = {
+    ScenarioType.URA: UI_SCENARIO_URA,
+    ScenarioType.AOHARUHAI: UI_SCENARIO_AOHARUHAI,
+    ScenarioType.TRACKBLAZER: UI_SCENARIO_TRACKBLAZER,
+    ScenarioType.GRAND_CONCERT: UI_SCENARIO_GRANDCONCERT,
+}
+
+# Where the CAREER button sits on Home, as a region to search rather than a
+# point to press.
+CAREER_REGION = (380, 1020, 715, 1160)
+
+# The carousel holds more scenarios than this app can start a run in, and it
+# opens wherever it was left, so swipe far enough to cycle it from any
+# starting position rather than tying attempts to the number of scenarios.
+SCENARIO_SWIPES = 6
+
+# How many times to refresh the borrow list looking for the wanted card.
+BORROW_REFRESHES = 18
+
+
+def script_main_menu(ctx):
+    """Home. Either the loop is done, or a new career starts here.
+
+    Home is recognised by the bottom nav tab, **not** by the CAREER button.
+    That button's art rotates with in-game events - one chibi and dumbbells one
+    day, two Champions Meeting characters the next - and the lettering moves
+    with it, so no crop matches both rotations. Twice in one week a rotation
+    left the parent unable to find Home at all.
+
+    CAREER is then located by colour, which keeps the button being pressed
+    where it actually is rather than where it usually is.
+    """
+    career = ctx.career
+    if career.career_finished:
+        ctx.task.end_task(TaskStatus.TASK_STATUS_SUCCESS, EndTaskReason.COMPLETE)
+        return
+
+    # A new career begins here, so forget what the agenda picker did for the
+    # last one. Normally the process soft-restarts between careers and rebuilds
+    # this, but when a career ends without the task ending, a stale 'done'
+    # makes the next career skip the agenda and run the game's default
+    # schedule - silently, which is this project's worst failure mode.
+    if career.agenda_phase:
+        log.info("New career - resetting the agenda picker")
+        career.agenda_phase = ''
+        career.agenda_steps = 0
+        career.agenda_waits = 0
+
+    try:
+        img = ctx.current_screen if ctx.current_screen is not None else ctx.ctrl.get_screen()
+        btn = find_green_button(img, *CAREER_REGION)
+        if btn:
+            ctx.ctrl.click(btn[0], btn[1], "Go to Scenario Selection")
+            return
+        # In the parent this search has never once succeeded: 135 recorded
+        # failures and no evidence of a hit, so every Home transition was made
+        # on the fixed point below. That matters, because the colour search is
+        # the protection against the button's art rotating - and a protection
+        # that never fires is not protection. Report what was in the region so
+        # an empty mask can be told from a rejected blob.
+        why = describe_green_candidates(img, *CAREER_REGION)
+        log.warning("Home: could not find the CAREER button by colour - "
+                    f"using the fixed point [{why}]")
+    except Exception as e:
+        log.warning(f"Home: CAREER button search failed ({e}) - using the fixed point")
+    ctx.ctrl.click_by_point(TO_CULTIVATE_SCENARIO_CHOOSE)
+
+
+def script_scenario_select(ctx):
+    """The scenario carousel. Swipe until the task's scenario is on screen."""
+    wanted = ctx.task.detail.scenario
+    template = SCENARIO_TEMPLATES.get(wanted)
+    if template is None:
+        log.error(f"No scenario template for {wanted} - cannot start a career")
+        ctx.task.end_task(TaskStatus.TASK_STATUS_FAILED, EndTaskReason.SCENARIO_NOT_FOUND)
+        return
+
+    time.sleep(2)   # a slow connection can still be drawing the carousel
+    for _ in range(SCENARIO_SWIPES):
+        if image_match(ctx.ctrl.get_screen(to_gray=True), template).find_match:
+            log.info(f"Scenario Select: found {wanted.name}")
+            ctx.ctrl.click_by_point(TO_CULTIVATE_PREPARE_NEXT)
+            return
+        ctx.ctrl.swipe(x1=400, y1=600, x2=500, y2=600, duration=300, name="next scenario")
+        time.sleep(1)
+
+    log.error(f"Scenario Select: {wanted.name} not found after "
+              f"{SCENARIO_SWIPES} swipes")
+    ctx.task.end_task(TaskStatus.TASK_STATUS_FAILED, EndTaskReason.SCENARIO_NOT_FOUND)
+
+
+def script_umamusume_select(ctx):
+    """The trainee picker. The game keeps the last choice, so just go on."""
+    ctx.ctrl.click_by_point(TO_CULTIVATE_PREPARE_NEXT)
+
+
+def script_extend_umamusume_select(ctx):
+    """The legacy (parents) picker.
+
+    With `use_last_parents` the game's own memory is enough. Otherwise run the
+    auto-select flow, which is four clicks in a fixed order.
+    """
+    if getattr(ctx.task.detail, 'use_last_parents', False):
+        ctx.ctrl.click_by_point(TO_CULTIVATE_PREPARE_NEXT)
+        return
+    for point in (TO_CULTIVATE_PREPARE_AUTO_SELECT,
+                  TO_CULTIVATE_PREPARE_INCLUDE_GUEST,
+                  TO_CULTIVATE_PREPARE_CONFIRM,
+                  TO_CULTIVATE_PREPARE_NEXT):
+        ctx.ctrl.click_by_point(point)
+        time.sleep(1)
+
+
+def script_support_card_select(ctx):
+    """The support card deck. An empty borrow slot means go and fill it."""
+    if image_match(ctx.ctrl.get_screen(to_gray=True),
+                   REF_CULTIVATE_SUPPORT_CARD_EMPTY).find_match:
+        ctx.ctrl.click_by_point(TO_FOLLOW_SUPPORT_CARD_SELECT)
+        return
+    ctx.ctrl.click_by_point(TO_CULTIVATE_PREPARE_NEXT)
+
+
+def _still_on_borrow_screen(ctx, img) -> bool:
+    """True while the borrow list is still the screen being looked at.
+
+    Scrolling a list the bot has already left would click on whatever replaced
+    it, so every pass re-checks the header before swiping again.
+    """
+    try:
+        import cv2
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        h, w = gray.shape[:2]
+        x1, y1, x2, y2 = 279, 48, 326, 76
+        roi = gray[max(0, min(h, y1)):max(0, min(h, y2)),
+                   max(0, min(w, x1)):max(0, min(w, x2))]
+        return bool(image_match(roi, REF_BORROW_CARD).find_match)
+    except Exception:
+        # A failed check must not end the search; the refresh budget bounds it.
+        return True
+
+
+def script_follow_support_card_select(ctx):
+    """The borrow list: find the card the task asked for, or refresh and retry.
+
+    Each pass scrolls the visible list down and then back up, reading every
+    card, before spending a refresh on a new set of players. The parent wrote
+    those two directions as two identical blocks; they are one loop here, which
+    changes nothing about the order of the swipes.
+    """
+    for _ in range(BORROW_REFRESHES):
+        for direction, (y_from, y_to) in (("down", (1000, 400)), ("up", (400, 1000))):
+            for _pass in range(3):
+                img = ctx.ctrl.get_screen()
+                if find_support_card(ctx, img):
+                    return
+                if not _still_on_borrow_screen(ctx, img):
+                    log.info("Borrow list: no longer on the borrow screen - "
+                             "stopping the card search")
+                    return
+                ctx.ctrl.swipe(x1=350, y1=y_from, x2=350, y2=y_to, duration=600,
+                               name=f"scroll {direction} the borrow list")
+                time.sleep(0.5)
+        ctx.ctrl.click_by_point(FOLLOW_SUPPORT_CARD_SELECT_REFRESH)
+        time.sleep(1.2)
+
+    log.warning(f"Borrow list: {ctx.task.detail.follow_support_card_name!r} at level "
+                f"{ctx.task.detail.follow_support_card_level}+ not found after "
+                f"{BORROW_REFRESHES} refreshes - starting without it")
+    ctx.ctrl.click_by_point(FOLLOW_SUPPORT_CARD_SELECT_REFRESH)
+
+
+def script_cultivate_final_check(ctx):
+    """The pre-start screen behind the Final Confirmation dialog."""
+    ctx.ctrl.click_by_point(CULTIVATE_FINAL_CHECK_START)

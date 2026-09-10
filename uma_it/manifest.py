@@ -17,8 +17,27 @@ from bot.base.manifest import AppManifest
 from bot.base.resource import NOT_FOUND_UI, UI
 import bot.base.log as logger
 
-from uma_it.asset.ui import INFO, INDEPENDENT_TRAINING_WAIT, INDEPENDENT_TRAINING_RESULTS
-from uma_it import career
+from uma_it.asset.ui import (
+    INFO,
+    MAIN_MENU,
+    CULTIVATE_SCENARIO_SELECT,
+    CULTIVATE_UMAMUSUME_SELECT,
+    CULTIVATE_EXTEND_UMAMUSUME_SELECT,
+    CULTIVATE_SUPPORT_CARD_SELECT,
+    CULTIVATE_FOLLOW_SUPPORT_CARD_SELECT,
+    CULTIVATE_FINAL_CHECK,
+    INDEPENDENT_TRAINING_WAIT,
+    INDEPENDENT_TRAINING_RESULTS,
+    CULTIVATE_RESULT,
+    CULTIVATE_RESULT_1,
+    CULTIVATE_RESULT_2,
+    CULTIVATE_FINISH,
+    CULTIVATE_LEVEL_RESULT,
+    HISTORICAL_RATING_UPDATE,
+    SCENARIO_RATING_UPDATE,
+    RECEIVE_CUP,
+)
+from uma_it import career, collect, enter
 from uma_it.context import build_context
 from uma_it.dialogs import script_dialog, script_not_found_ui
 from uma_it.screens import scan_ui_list
@@ -40,24 +59,32 @@ script_dicts: Dict[UmaItTaskType, Dict[UI, Callable]] = {
         INFO: script_dialog,
 
         # entering a career
-        # MAIN_MENU: ...,
-        # CULTIVATE_SCENARIO_SELECT: ...,
-        # CULTIVATE_UMAMUSUME_SELECT: ...,
-        # CULTIVATE_EXTEND_UMAMUSUME_SELECT: ...,
-        # CULTIVATE_SUPPORT_CARD_SELECT: ...,
-        # CULTIVATE_FOLLOW_SUPPORT_CARD_SELECT: ...,
-        # CULTIVATE_FINAL_CHECK: ...,
+        MAIN_MENU: enter.script_main_menu,
+        CULTIVATE_SCENARIO_SELECT: enter.script_scenario_select,
+        CULTIVATE_UMAMUSUME_SELECT: enter.script_umamusume_select,
+        CULTIVATE_EXTEND_UMAMUSUME_SELECT: enter.script_extend_umamusume_select,
+        CULTIVATE_SUPPORT_CARD_SELECT: enter.script_support_card_select,
+        CULTIVATE_FOLLOW_SUPPORT_CARD_SELECT: enter.script_follow_support_card_select,
+        CULTIVATE_FINAL_CHECK: enter.script_cultivate_final_check,
 
         # the run itself - fifty of a career's fifty-two minutes
         INDEPENDENT_TRAINING_WAIT: career.script_wait,
         INDEPENDENT_TRAINING_RESULTS: career.script_results,
 
-        # collecting the result
-        # CULTIVATE_RESULT / _1 / _2, CULTIVATE_FINISH, CULTIVATE_LEVEL_RESULT,
-        # HISTORICAL_RATING_UPDATE, SCENARIO_RATING_UPDATE, RECEIVE_CUP
+        # collecting the result. Three crops of the same result screen share
+        # one handler.
+        CULTIVATE_RESULT: collect.script_cultivate_result,
+        CULTIVATE_RESULT_1: collect.script_cultivate_result,
+        CULTIVATE_RESULT_2: collect.script_cultivate_result,
+        CULTIVATE_FINISH: collect.script_cultivate_finish,
+        CULTIVATE_LEVEL_RESULT: collect.script_cultivate_level_result,
+        HISTORICAL_RATING_UPDATE: collect.script_historical_rating_update,
+        SCENARIO_RATING_UPDATE: collect.script_scenario_rating_update,
+        RECEIVE_CUP: collect.script_receive_cup,
 
-        # optional: CULTIVATE_LEARN_SKILL, CONFIRMATION_LEARNSKILL_BUTTON,
-        # FACTOR_RECEIVE, FACTOR_REROLL
+        # Still unwritten, and both switched off in the default task:
+        # CULTIVATE_LEARN_SKILL, CONFIRMATION_LEARNSKILL_BUTTON (skill buying)
+        # FACTOR_RECEIVE, FACTOR_REROLL (spark reroll)
 
         # The blind fallback, for a frame matching no screen at all. Several
         # screens on this path are advanced only by its corner click.

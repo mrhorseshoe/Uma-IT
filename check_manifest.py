@@ -81,13 +81,20 @@ if unhandled:
     print("  still to write: " + ", ".join(sorted(unhandled)))
 check("NOT_FOUND_UI has a fallback handler", NOT_FOUND_UI in handled,
       "not yet written - the app cannot run without it")
+check("the only screens left are the optional features",
+      set(unhandled) <= {'CULTIVATE_LEARN_SKILL', 'CONFIRMATION_LEARNSKILL_BUTTON',
+                         'FACTOR_RECEIVE', 'FACTOR_REROLL'},
+      str(sorted(unhandled)))
 
 print("\nan unhandled screen warns rather than raising")
 
 
 class _Ctx:
     task = task
-    current_ui = manifest.ui_list[0]
+    # A screen that is in no table, rather than one that merely has no handler
+    # yet - so this stays a real test of the unhandled path once every screen
+    # on the list is handled.
+    current_ui = UI("NOT_A_REAL_SCREEN", [], [])
 
 
 try:
@@ -102,8 +109,5 @@ for field in ('app_name', 'app_package_name', 'app_activity_name',
               'build_context', 'build_task', 'ui_list', 'script'):
     check(f"{field} is set", getattr(manifest, field, None) is not None)
 
-expected = [f for f in failures if f == "NOT_FOUND_UI has a fallback handler"]
-print(f"\n{len(failures)} failed"
-      f"{' (all expected at this stage)' if failures and failures == expected else ''}")
-# The missing fallback is a known, recorded gap rather than a regression.
-sys.exit(1 if [f for f in failures if f not in expected] else 0)
+print(f"\n{len(failures)} failed")
+sys.exit(1 if failures else 0)

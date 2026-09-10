@@ -6,11 +6,18 @@ the colour thresholds were tuned against real frames; both are calibration, and
 calibration gets moved, not redrawn.
 """
 import re
+from difflib import SequenceMatcher
 
 import cv2
 import numpy
 
+from bot.recog.image_matcher import image_match
 from bot.recog.ocr import ocr_line
+import bot.base.log as logger
+
+from uma_it.asset.template import REF_FOLLOW_SUPPORT_CARD_DETECT_LABEL
+
+log = logger.get_logger(__name__)
 
 # The My Agendas list holds eight slots and shows three at a time. Rows have no
 # stable template - each is a user-named banner - so the green "Load List"
@@ -207,3 +214,48 @@ def describe_green_candidates(origin_img, x1: int, y1: int, x2: int, y2: int,
         return f"{on} green px, {count - 1} blobs; largest: " + "; ".join(parts)
     except Exception as e:
         return f"diagnostic failed: {e!r}"
+
+
+def find_support_card(ctx, img):
+    """Find and click a borrowable support card matching the task's request.
+
+    Every card on the screen carries the same label template. Each match is
+    blanked out after being read so the loop moves on to the next one rather
+    than re-finding the best match forever.
+
+    The title is fuzzy-matched at 0.7 against the name saved in the task, which
+    is why that name has to match the game exactly - it is OCR'd off the card.
+    The in-game master database is the source of truth for those names.
+    """
+    detail = ctx.task.detail
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    while True:
+        match_result = image_match(img, REF_FOLLOW_SUPPORT_CARD_DETECT_LABEL)
+        if not match_result.find_match:
+            return False
+        pos = match_result.matched_area
+        card = img[pos[0][1] - 125:pos[1][1] + 10, pos[0][0] - 140:pos[1][0] + 380]
+        # blank this label so the next pass finds the next card
+        img[pos[0][1]:pos[1][1], pos[0][0]:pos[1][0]] = 0
+
+        level_img = cv2.copyMakeBorder(card[125:145, 68:111], 20, 20, 20, 20,
+                                       cv2.BORDER_CONSTANT, None, (255, 255, 255))
+        name_img = cv2.copyMakeBorder(card[63:94, 132:439], 20, 20, 20, 20,
+                                      cv2.BORDER_CONSTANT, None, (255, 255, 255))
+
+        level_text = ocr_line(level_img)
+        if not level_text:
+            continue
+        digits = re.sub(r'\D', '', level_text)
+        if not digits:
+            log.info("Borrow list: skipping a card whose level could not be read")
+            continue
+        if int(digits) < detail.follow_support_card_level:
+            continue
+
+        title = ocr_line(name_img)
+        if SequenceMatcher(None, title, detail.follow_support_card_name).ratio() > 0.7:
+            ctx.ctrl.click(match_result.center_point[0],
+                           match_result.center_point[1] - 75,
+                           f"Borrow {detail.follow_support_card_name} (level {digits})")
+            return True

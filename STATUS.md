@@ -77,8 +77,15 @@ way, and for the rules any new handler has to respect.
         Delete Data sits on the same screen
       — **still never run against the live game** (see DESIGN.md)
 
+- [x] `uma_it/enter.py` and `uma_it/collect.py` — Home through to the start
+      dialog, and the result screens after. **19 of 22 screens now have a
+      handler**; the three left are the two optional features
+      — `check_handlers.py`: 25 assertions. Home clears a stale agenda phase,
+        Scenario Select fails the task rather than starting the wrong one, and
+        the finish screen still finishes a career when asked for skill buying,
+        which this app has not written
+
 ## Next
-- [ ] Enter and collect handlers — ~300 lines
 - [ ] `main.py` — device checks, scheduler, HTTP server
 - [ ] Web UI — IT-only; the parent project's task modal is 5,330 lines for a
       career mode this app does not play
@@ -87,15 +94,14 @@ way, and for the rules any new handler has to respect.
 ## Line budget
 
 Target is ~2,050 lines for the core and ~2,700 with both optional features,
-against the parent project's 9,415 lines of module Python. `uma_it/` is at
-**1,892** with the enter/collect handlers still to come.
+against the parent project's 9,415 lines of module Python. `uma_it/` is at **2,266**, with only the two optional features left.
 
 | Piece | Estimate |
 |---|---|
 | Assets (done) | 200 |
-| Enter/collect handlers | ~300 |
-| Blind fallback, IT-only | ~60 |
-| Parse helpers, core | ~180 |
+| Enter and collect handlers (done) | 300 |
+
+| Parse helpers (done) | 260 |
 | Task + context (done) | 300 |
 | Hooks | ~120 |
 | Manifest and screens (done) | 240 |
@@ -142,7 +148,11 @@ py -3.10 check_agenda.py
 py -3.10 check_start.py
 ```
 
-All nine exit non-zero on failure. Run them after touching anything under
+```bash
+py -3.10 check_handlers.py
+```
+
+All ten exit non-zero on failure. Run them after touching anything under
 `uma_it/` or `bot/`.
 
 ## Unresolved: do the Skip presses matter?
