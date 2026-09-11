@@ -31,6 +31,12 @@ log = logger.get_logger(__name__)
 
 APP_NAME = "uma-it"
 
+# Failed careers in a row before the loop stops itself. Three, because a single
+# failure is usually a recoverable screen mishap and the run after it succeeds,
+# while a real cause - no TP, a game update, a changed screen - fails every
+# time and would otherwise retry until someone noticed.
+MAX_CONSECUTIVE_FAILURES = 3
+
 
 class TaskDetail:
     """The settings, as read off the task payload.
@@ -52,6 +58,11 @@ class TaskDetail:
     # -- the loop -----------------------------------------------------------
     loop_count: int          # 0 = run until stopped
     loops_done: int          # durable; see the module docstring
+    # Runs that ended FAILED, since the last one that did not. Durable for the
+    # same reason `loops_done` is, and it exists because the two counters mean
+    # different things: a career that never started is not a career the user
+    # asked for. See `UmaItTask.end_task`.
+    consecutive_failures: int
     # 0 never restores TP, so a career fails rather than being paid for.
     # Higher values authorise spending, carats included - which is real
     # currency, so the default stays 0.
@@ -107,15 +118,44 @@ class UmaItTask(Task):
         end_task runs before the task list is written, which is the only point
         where incrementing the counter and persisting it are guaranteed to
         happen in that order.
+
+        **Only a career that completed counts.** A FAILED run used to increment
+        `loops_done` as well, which made "2 of 2 runs" true of two careers that
+        never started: on 11 Sep a two-run loop reported itself finished in
+        thirty seconds, both runs having died on the TP prompt before the
+        career began. A user asking for two careers is asking for two careers.
+
+        The counter was doing a second job, though - it was also the only thing
+        stopping a loop that fails instantly from retrying forever, which is
+        what an out-of-TP account would do. So failures are still counted,
+        separately: `MAX_CONSECUTIVE_FAILURES` in a row stops the scheduler,
+        and the flag is persisted by the same end-of-run save that writes this
+        counter, so the soft restart does not resume it.
         """
         try:
             detail = getattr(self, 'detail', None)
-            if detail is not None and status in (TaskStatus.TASK_STATUS_SUCCESS,
-                                                 TaskStatus.TASK_STATUS_FAILED):
+            if detail is not None and status == TaskStatus.TASK_STATUS_SUCCESS:
+                detail.consecutive_failures = 0
                 detail.loops_done = (getattr(detail, 'loops_done', 0) or 0) + 1
                 limit = getattr(detail, 'loop_count', 0) or 0
                 log.info("Loop run %d/%s finished"
                          % (detail.loops_done, limit if limit else "unlimited"))
+            elif detail is not None and status == TaskStatus.TASK_STATUS_FAILED:
+                failures = (getattr(detail, 'consecutive_failures', 0) or 0) + 1
+                detail.consecutive_failures = failures
+                done = getattr(detail, 'loops_done', 0) or 0
+                limit = getattr(detail, 'loop_count', 0) or 0
+                log.warning("Career failed (%s) - run %d/%s not counted, "
+                            "%d consecutive failure(s)"
+                            % (getattr(reason, 'value', reason), done + 1,
+                               limit if limit else "unlimited", failures))
+                if failures >= MAX_CONSECUTIVE_FAILURES:
+                    log.error("%d careers failed in a row without one completing "
+                              "- stopping the loop rather than retrying. Fix the "
+                              "cause, then start it again from the dashboard."
+                              % failures)
+                    from bot.engine.scheduler import scheduler
+                    scheduler.stop()
         except Exception:
             pass
         super().end_task(status, reason)
@@ -155,6 +195,7 @@ def build_task(task_execute_mode: TaskExecuteMode, task_type: int,
 
     td.loop_count = _int(data.get('loop_count'), 0, 0)
     td.loops_done = _int(data.get('loops_done'), 0, 0)
+    td.consecutive_failures = _int(data.get('consecutive_failures'), 0, 0)
     td.allow_recover_tp = _int(data.get('allow_recover_tp'), 0, 0)
 
     td.skip_learn_skill = bool(data.get('skip_learn_skill', True))

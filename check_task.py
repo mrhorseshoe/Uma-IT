@@ -17,6 +17,7 @@ sys.path.insert(0, os.getcwd())
 
 from bot.base.purge import serialize_umamusume_task
 from bot.base.task import TaskExecuteMode, TaskStatus, EndTaskReason
+from uma_it.task import EndTaskReason as UmaItEndReason
 from uma_it.task import build_task, APP_NAME
 from uma_it.define import ScenarioType
 
@@ -118,6 +119,46 @@ check("a finished run increments loops_done", t3.detail.loops_done == 27,
 after = build_task(LOOP, 1, "counting", None, serialize_umamusume_task(t3) or {})
 check("  and the increment survives a round trip", after.detail.loops_done == 27,
       str(after.detail.loops_done))
+
+# A failed career is not a career the user asked for. Counting one as a run
+# made "2 of 2 runs" true of a two-run loop that reported itself finished in
+# thirty seconds on 11 Sep, both careers having died on the TP prompt before
+# either began.
+t4 = build_task(LOOP, 2, "counting", None, dict(REAL, loops_done=0, loop_count=2))
+t4.end_task(TaskStatus.TASK_STATUS_FAILED, UmaItEndReason.TP_NOT_ENOUGH)
+check("a failed career does not consume a run", t4.detail.loops_done == 0,
+      str(t4.detail.loops_done))
+check("  but is counted as a failure", t4.detail.consecutive_failures == 1,
+      str(t4.detail.consecutive_failures))
+back = build_task(LOOP, 2, "counting", None, serialize_umamusume_task(t4) or {})
+check("  and the failure count survives a round trip",
+      back.detail.consecutive_failures == 1, str(back.detail.consecutive_failures))
+
+t4.end_task(TaskStatus.TASK_STATUS_SUCCESS, EndTaskReason.COMPLETE)
+check("a career that completes clears the failure streak",
+      t4.detail.consecutive_failures == 0 and t4.detail.loops_done == 1,
+      f"{t4.detail.consecutive_failures} {t4.detail.loops_done}")
+
+# The counter used to do a second job: it was the only thing stopping a loop
+# that fails instantly from retrying forever. That job now belongs here.
+from bot.engine.scheduler import scheduler
+from uma_it.task import MAX_CONSECUTIVE_FAILURES
+scheduler.active = True
+t5 = build_task(LOOP, 0, "counting", None, dict(REAL, loops_done=0, loop_count=0))
+for _ in range(MAX_CONSECUTIVE_FAILURES):
+    t5.end_task(TaskStatus.TASK_STATUS_FAILED, UmaItEndReason.TP_NOT_ENOUGH)
+check(f"{MAX_CONSECUTIVE_FAILURES} failures in a row stop the loop",
+      scheduler.active is False, str(scheduler.active))
+check("  without any of them counting as a run", t5.detail.loops_done == 0,
+      str(t5.detail.loops_done))
+
+scheduler.active = True
+t6 = build_task(LOOP, 0, "counting", None, dict(REAL, loops_done=0, loop_count=0))
+for _ in range(MAX_CONSECUTIVE_FAILURES - 1):
+    t6.end_task(TaskStatus.TASK_STATUS_FAILED, UmaItEndReason.TP_NOT_ENOUGH)
+check("  and one short of the limit keeps running", scheduler.active is True,
+      str(scheduler.active))
+scheduler.active = False
 
 # The scheduler reads these two off the detail by name to decide when a loop is
 # done. A rename here would silently make every loop unlimited.

@@ -65,7 +65,13 @@ def step(ctx, body_text: str = '', header_pos=None) -> bool:
     Returns True whenever it acted, so the caller can leave the rest of the
     frame alone. A False means the caller should decline whatever it was doing
     - fail the career, or keep the original sparks.
+
+    `body_text` is matched in lower case. Every test below was written against
+    a caller that passed '', so the case never came up until one started
+    passing the real OCR; the game writes "restore TP?", and both careers of
+    the 11 Sep 01:16 run failed in fifteen seconds on the mismatch.
     """
+    body_text = (body_text or '').lower()
     career = getattr(ctx, 'career', None)
     tries = getattr(career, 'tp_recover_tries', 0) + 1
     if career is not None:

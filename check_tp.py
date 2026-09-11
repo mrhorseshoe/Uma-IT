@@ -94,7 +94,7 @@ check("a chocolate item on the row is skipped for carats",
 
 tp.ocr_line = lambda _img: "Juice"
 ctx = FakeCtx(allow_recover_tp=2)
-tp.step(ctx, body_text="use your choc carrot?")
+tp.step(ctx, body_text="Use your Choc Carrot?")
 check("  and so is one named only in the dialog body",
       ctx.ctrl.clicks == [NAME(USE_CARROT_RECOVER_TP)], str(ctx.ctrl.clicks))
 
@@ -129,6 +129,19 @@ ctx = FakeCtx(allow_recover_tp=2)
 tp.step(ctx, body_text="you need 12 more tp. restore tp?")
 check("opens the recovery screen", ctx.ctrl.clicks == [NAME(TO_RECOVER_TP)],
       str(ctx.ctrl.clicks))
+
+# The body arrives from OCR, in the game's own case. Every case above was
+# written lower-cased against a caller that passed '', so when one started
+# passing the real read, both careers of the 11 Sep 01:16 run failed in fifteen
+# seconds against a test suite that was entirely green. This is the exact
+# sentence off the screen the bot was stuck on.
+ctx = FakeCtx(allow_recover_tp=2)
+acted = tp.step(ctx, body_text="You need 5 more TP to start a Career Scenario,"
+                               "and 35 more TP if you wish to use Event Boost."
+                               "Would you like to restore TP?")
+check("the game's own capitalisation is accepted", acted is True)
+check("  and it opens the recovery screen",
+      ctx.ctrl.clicks == [NAME(TO_RECOVER_TP)], str(ctx.ctrl.clicks))
 
 print("\ngiving up rather than feeding the click guard")
 ctx = FakeCtx(allow_recover_tp=2)
