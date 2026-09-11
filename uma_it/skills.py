@@ -33,6 +33,7 @@ from bot.recog.ocr import ocr_line
 from uma_it.asset.point import (
     RETURN_TO_CULTIVATE_FINISH,
     CULTIVATE_LEARN_SKILL_CONFIRM,
+    CULTIVATE_LEARN_SKILL_CONFIRM_AGAIN,
 )
 from uma_it.const import SKILL_LEARN_PRIORITY_LIST
 from uma_it.parse import find_skill, get_skill_list
@@ -52,6 +53,27 @@ def _leave(ctx, why: str):
     log.info(why)
     ctx.career.learn_skill_done = True
     ctx.ctrl.click_by_point(RETURN_TO_CULTIVATE_FINISH)
+
+
+def script_confirm_learn(ctx):
+    """"Learn the above skills?" - the click that actually spends the points.
+
+    Its own screen, not a second crop of the skill screen, which is what the
+    manifest used to call it. `CONFIRMATION_LEARNSKILL_BUTTON` is a crop of
+    this dialog's **Learn** button, so it matches this dialog and nothing else -
+    and routing it to `script_learn_skill` meant arriving with the buying pass
+    already done, taking the `_leave` branch, and clicking Back at (90, 1190).
+
+    That point is inside this dialog, on **Cancel**. So the bot cancelled its
+    own purchase, was asked "Exit without learning skills?", agreed, and went
+    round again. On 11 Sep one career made four passes over the same 4108
+    points, selecting about 4000 of them each time and discarding every one.
+    The tell was in the logs the whole time: the skill point total read 4108 at
+    the start of every pass.
+    """
+    log.info("Confirmation: 'Learn the above skills?' - learning")
+    ctx.ctrl.click_by_point(CULTIVATE_LEARN_SKILL_CONFIRM_AGAIN)
+    time.sleep(1)
 
 
 def _read_every_page(ctx, wanted, blacklist):

@@ -158,6 +158,40 @@ check("  while the run's copy has it removed",
 check("  and it confirms at the end",
       ctx.ctrl.clicks[-1] == NAME(CULTIVATE_LEARN_SKILL_CONFIRM), str(ctx.ctrl.clicks))
 
+# The click that actually spends the points, and the screen it belongs to.
+# CONFIRMATION_LEARNSKILL_BUTTON is a crop of this dialog's Learn button, so it
+# matches the dialog and nothing else - but the manifest called the two "both
+# crops of the same screen" and pointed both at script_learn_skill. Arriving
+# there with the pass done takes the _leave branch and clicks Back at
+# (90, 1190), which is inside this dialog, on Cancel. Four passes over the same
+# 4108 points on 11 Sep, every one discarded.
+print("\nthe 'Learn the above skills?' dialog is its own screen")
+from uma_it.asset.ui import CONFIRMATION_LEARNSKILL_BUTTON, CULTIVATE_LEARN_SKILL
+from uma_it.asset.point import CULTIVATE_LEARN_SKILL_CONFIRM_AGAIN
+from uma_it.manifest import script_dicts
+from uma_it.task import UmaItTaskType
+
+table = script_dicts[UmaItTaskType.CAREER]
+check("it has a handler of its own",
+      table.get(CONFIRMATION_LEARNSKILL_BUTTON) is not table.get(CULTIVATE_LEARN_SKILL),
+      str(table.get(CONFIRMATION_LEARNSKILL_BUTTON)))
+
+ctx = FakeCtx(career_state={'learn_skill_done': True}, skip_learn_skill=False)
+table[CONFIRMATION_LEARNSKILL_BUTTON](ctx)
+check("  and it clicks Learn",
+      ctx.ctrl.clicks == [NAME(CULTIVATE_LEARN_SKILL_CONFIRM_AGAIN)],
+      str(ctx.ctrl.clicks))
+check("  never Back, which lands on this dialog's Cancel",
+      NAME(RETURN_TO_CULTIVATE_FINISH) not in ctx.ctrl.clicks, str(ctx.ctrl.clicks))
+
+# Back is (90, 1190) and this dialog's Cancel spans roughly x 63-341,
+# y 1148-1218 - measured off the frame the bot was looping on. Anything routed
+# to this screen that clicks Back is pressing Cancel, whatever it meant to do.
+bx, by = (RETURN_TO_CULTIVATE_FINISH.coordinate.x,
+          RETURN_TO_CULTIVATE_FINISH.coordinate.y)
+check("  (the Back point really is on Cancel)",
+      63 <= bx <= 341 and 1148 <= by <= 1218, f"({bx}, {by})")
+
 print("\nleaving without buying")
 ctx = FakeCtx(career_state={'learn_skill_done': True}, skip_learn_skill=False)
 skills_mod.script_learn_skill(ctx)

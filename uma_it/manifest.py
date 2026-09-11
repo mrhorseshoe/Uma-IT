@@ -139,9 +139,13 @@ script_dicts: Dict[UmaItTaskType, Dict[UI, Callable]] = {
         FACTOR_RECEIVE: spark.script_factor_receive,
         FACTOR_REROLL: spark.script_factor_reroll,
 
-        # Skill buying. Both crops lead to the same screen.
+        # Skill buying. These are two different screens, not two crops of one:
+        # CONFIRMATION_LEARNSKILL_BUTTON is a crop of the **Learn** button on
+        # the "Learn the above skills?" dialog, so it matches that dialog
+        # alone. Pointing both at script_learn_skill made the bot click Cancel
+        # on its own purchase - see skills.script_confirm_learn.
         CULTIVATE_LEARN_SKILL: skills.script_learn_skill,
-        CONFIRMATION_LEARNSKILL_BUTTON: skills.script_learn_skill,
+        CONFIRMATION_LEARNSKILL_BUTTON: skills.script_confirm_learn,
 
         # The blind fallback, for a frame matching no screen at all. Several
         # screens on this path are advanced only by its corner click.
