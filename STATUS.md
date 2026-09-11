@@ -3,6 +3,30 @@
 Where the build has got to. See `DESIGN.md` for why the project is shaped this
 way, and for the rules any new handler has to respect.
 
+## Where it stands now
+
+**Working against the live game.** On 11 September 2026 it completed five
+consecutive careers across two loops with no errors — the first runs in which
+skill buying and spark reroll both went end to end.
+
+| | |
+|---|---|
+| screens scanned | 22, all with handlers |
+| dialog titles | 29 with actions, 30 decoys that deliberately lose |
+| template PNGs | 54 |
+| task settings | 16 (14 user-facing) |
+| `uma_it/` | 3,842 lines |
+| dashboard | `public/index.html`, 874 lines, one file |
+| checks | 17 scripts |
+
+Verified live: skill buying spends a budget down to less than the cheapest
+remaining skill (4108 points to 3 in one career); spark reroll rerolls on a
+miss, keeps on a hit, and keeps the larger set when neither qualifies; TP
+restore prefers an item, falls back to carats, and never spends a chocolate one.
+
+The section below is the build log, kept in the order things were done. Figures
+in it are from the time each entry was written.
+
 ## Done
 
 - [x] Repository, layout and design recorded
@@ -75,15 +99,16 @@ way, and for the rules any new handler has to respect.
         confirms a one-way door. The start dialog checks the tab rather than
         assuming it. The pending-run dialog prefers the colour search, since
         Delete Data sits on the same screen
-      — **still never run against the live game** (see DESIGN.md)
+      — since proven live: every career since 11 Sep 2026 has started through
+        this path
 
 - [x] `uma_it/enter.py` and `uma_it/collect.py` — Home through to the start
       dialog, and the result screens after. **19 of 22 screens now have a
       handler**; the three left are the two optional features
       — `check_handlers.py`: 25 assertions. Home clears a stale agenda phase,
         Scenario Select fails the task rather than starting the wrong one, and
-        the finish screen still finishes a career when asked for skill buying,
-        which this app has not written
+        the finish screen still finishes a career when asked for skill buying
+        (which was unwritten at the time; it is written now)
 
 - [x] `main.py` and `device.py` — the app starts, registers, restores its task
       list and serves the dashboard. **It is runnable**
@@ -94,7 +119,7 @@ way, and for the rules any new handler has to respect.
         really are dropped when the app is unknown, and that `main()` does it
         in the right order
 
-- [x] The dashboard — `public/index.html`, 456 lines, one file. No build step,
+- [x] The dashboard — `public/index.html`, one file. No build step,
       no framework, no CDN, and same-origin API calls
       — `check_ui.py`: every path the page calls is a route the server serves,
         every setting it sends is one `build_task` reads, every scenario option
@@ -145,18 +170,34 @@ way, and for the rules any new handler has to respect.
         the colour thresholds are pinned together
 
 ## Next
-- [ ] A first live career on **this** app. `uma_it/start.py` has still never
-      faced the game - the parent's equivalent has, so the logic is proven
-      there, but this port has not been run. TP is no longer the blocker:
-      `allow_recover_tp` is on and restores from carats
+
+- [ ] **The spark tiebreak when both lists fit one page** has no live coverage.
+      `handle_spark_selection` counts rows when neither list overflows, which is
+      exact, and falls back to total stars only on a genuine tie. That branch
+      needs both sets under 9 rows — about 7% of tiebreaks — and has not come up
+      in a real career. Covered by `check_spark.py` and by the 137 captured
+      selection frames, not by the game
+- [ ] **The agenda first-click retry.** The first Load List click of a run does
+      not take; the flow reopens the list and clicks again, costing ~10s. It
+      happens once per career, every career. Three hypotheses have each been
+      disproved by measurement and the cause is still unknown. Harmless
+- [ ] **The watchdog capture stall** inherited from the parent: `get_screen`
+      occasionally returns byte-identical frames during the countdown, which
+      trips the 30s watchdog and restarts the game. The in-game clock keeps
+      perfect wall time across the event, so the game is fine and the bot's view
+      of it is what stalls. Costs about 40 seconds and no careers. The open
+      question is ADB / uiautomator2 / emulator screencap, not the threshold
+- [ ] **A packaging pass.** `requirements.txt` is inherited from the parent and
+      installs a good deal this bot never imports
 
 ## Line budget
 
 Target is ~2,050 lines for the core and ~2,700 with both optional features,
-against the parent project's 9,415 lines of module Python. `uma_it/` is at **3,598** with both optional features in - over the 2,700
-estimate, and the overage is theirs: skill buying and spark reroll together are
-about 1,150 lines of screen reading in the parent and are not much smaller when
-moved. The core without them is ~2,300.
+against the parent project's 9,415 lines of module Python. `uma_it/` is at
+**3,842** with both optional features in — over the 2,700 estimate, and the
+overage is theirs: skill buying and spark reroll together are about 1,150 lines
+of screen reading in the parent and are not much smaller when moved. The core
+without them is ~2,300.
 
 | Piece | Estimate |
 |---|---|
@@ -167,7 +208,7 @@ moved. The core without them is ~2,300.
 | Task + context (done) | 300 |
 | Hooks | ~120 |
 | Manifest and screens (done) | 240 |
-| Dashboard (done) | 456 |
+| Dashboard (done) | 874 |
 | Router and fallback (done) | 330 |
 | Countdown and results (done) | 90 |
 | Agenda picker and parse helpers (done) | 320 |
@@ -257,9 +298,8 @@ The process soft-restarts itself after every career, relaunching `main.py` with
 `UAT_AUTORESTART=1`, which takes the device from `config.yaml` and opens no
 browser window.
 
-Two things stand between this and a first career, and neither is more code -
-see below, and the note in DESIGN.md about `start.py` never having faced the
-live game.
+`start.bat` does the same thing with the interpreter check in front of it. See
+the README for installing and for configuring a run.
 
 ## Settled: the Skip presses do not matter
 

@@ -251,3 +251,18 @@ look unrecognised.
 - An Android emulator at 720x1280 with ADB debugging
 - Umamusume: Pretty Derby (Global)
 - A CUDA GPU is optional; PaddleOCR runs on CPU
+
+## License
+
+[MIT](LICENSE), covering this project's own code — everything under `uma_it/`,
+`public/`, the check scripts, `main.py` and `device.py`.
+
+**The engine under `bot/` is vendored** from
+[UAT-Global-Server](https://github.com/mrhorseshoe/UAT-Global-Server), which
+descends in turn from
+[TomerGamerTV/UAT-Global-Server](https://github.com/TomerGamerTV/UAT-Global-Server)
+and an upstream CN project before that — parts of it still carry Chinese
+comments from that lineage. **Neither of those repositories publishes a
+license**, so the terms on that code are whatever their authors' default
+copyright is, not MIT. If you intend to reuse `bot/`, take that up with them
+rather than relying on this file.
