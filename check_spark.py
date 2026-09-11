@@ -170,5 +170,66 @@ check("  and says so in the result",
       ctx.career.career_result.get('spark_reroll', {}).get('chosen') == 'original',
       str(ctx.career.career_result))
 
+# When neither set has a wanted spark the rule is "keep the set with the most
+# sparks". The scrollbar thumb answers that whenever a list overflows its page.
+# When neither does, both thumbs read the no-scrollbar sentinel 1.0, and the
+# comparison used to fall through to total stars - a different question, which
+# a three-row set with high stars wins over an eight-row one.
+print("\nneither set qualifies: the bigger set wins")
+
+
+def choose(rerolled, original, ratio_rerolled, ratio_original):
+    """Drive handle_spark_selection over a scripted carousel."""
+    state = {'view': 'rerolled'}
+    rows = {'rerolled': rerolled, 'original': original}
+    ratios = {'rerolled': ratio_rerolled, 'original': ratio_original}
+
+    def show(ctx, want):
+        state['view'] = want
+        return True
+
+    spark._spark_selection_show_view = show
+    spark._spark_selection_confirm = lambda ctx: True
+    spark._save_spark_debug = lambda *a, **k: None
+    spark.parse_spark_rows = lambda ctx, **kw: rows[state['view']]
+    spark.spark_scrollbar_ratio = lambda img: ratios[state['view']]
+
+    ctx = FakeCtx(career_state={'spark_reroll_phase': 'reroll_clicked'},
+                  spark_reroll_enabled=True,
+                  spark_reroll_targets={'nothing-matches-this': 3})
+    spark.handle_spark_selection(ctx)
+    return ctx.career.spark_reroll_result
+
+
+big = [row('speed', 1), row('mile', 1)] + [row(f'race{i}', 1) for i in range(6)]
+small_but_starry = [row('stamina', 3), row('dirt', 3), row('race9', 3)]
+
+res = choose(big, small_but_starry, 1.0, 1.0)
+check("8 rows beats 3 rows when both lists fit one page",
+      res['chosen'] == 'rerolled', f"{res['chosen']} - {res['reason']}")
+check("  and it says it counted sparks, not stars",
+      'rows' in res['reason'] and 'star' not in res['reason'], res['reason'])
+
+res = choose(small_but_starry, big, 1.0, 1.0)
+check("  and the same the other way round", res['chosen'] == 'original',
+      f"{res['chosen']} - {res['reason']}")
+
+# A genuine tie still falls through to stars, which is what it is for.
+res = choose([row('speed', 1), row('mile', 1)], [row('stamina', 3), row('dirt', 3)],
+             1.0, 1.0)
+check("equal row counts still fall through to total stars",
+      res['chosen'] == 'original' and 'star' in res['reason'], res['reason'])
+
+# And a measurable scrollbar still decides, since it sees below the fold.
+# Measured on the captured frames a scrollbar appears only at 9 rows, so the
+# row counts here are equal and only the thumb can separate them.
+nine = [row(f'r{i}', 1) for i in range(9)]
+res = choose(nine, list(nine), 0.70, 0.90)
+check("a shorter thumb still wins when the lists overflow",
+      res['chosen'] == 'rerolled' and 'scrollbar' in res['reason'], res['reason'])
+res = choose(nine, list(nine), 1.0, 0.70)
+check("  and a full page loses to one with rows below the fold",
+      res['chosen'] == 'original', f"{res['chosen']} - {res['reason']}")
+
 print(f"\n{len(failures)} failed")
 sys.exit(1 if failures else 0)

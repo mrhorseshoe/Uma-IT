@@ -54,6 +54,14 @@ from uma_it.task import EndTaskReason
 
 log = logger.get_logger(__name__)
 
+# `spark_scrollbar_ratio` returns exactly 1.0 when there is no scrollbar, which
+# means the whole list fits one page. Measured across the 137 captured
+# selection frames in `screenshot/spark_reroll/`, that sentinel and a real
+# measurement separate cleanly: every frame with a scrollbar showed 9 rows (the
+# page is full), every frame without showed 3-8 and never 9. So a ratio at this
+# threshold is a reliable "you are seeing all of it", not a failed read.
+FULLY_VISIBLE = 0.999
+
 
 def _spark_reroll_active(ctx) -> bool:
     detail = ctx.task.detail
@@ -249,8 +257,23 @@ def handle_spark_selection(ctx):
                     choose_rerolled = ratio_rerolled < ratio_original
                     reason = (f"more white sparks by scrollbar "
                               f"(thumb {ratio_rerolled:.2f} vs {ratio_original:.2f})")
+                elif (ratio_rerolled >= FULLY_VISIBLE
+                        and ratio_original >= FULLY_VISIBLE
+                        and len(rerolled_rows) != len(original_rows)):
+                    # Both thumbs are the no-scrollbar sentinel, so neither
+                    # list has anything below the fold and `parse_spark_rows`
+                    # has already counted every row of both. Counting is then
+                    # exact, and better evidence than the thumb ever is.
+                    #
+                    # Without this the tie fell through to total stars, which
+                    # answers a different question: a three-row set with high
+                    # stars beat an eight-row one. "The set with the most
+                    # sparks" is the rule, so count the sparks.
+                    choose_rerolled = len(rerolled_rows) > len(original_rows)
+                    reason = (f"more sparks, both lists fully visible "
+                              f"({len(rerolled_rows)} vs {len(original_rows)} rows)")
                 else:
-                    # near-identical list length: fall back to total visible stars
+                    # Genuinely the same length: fall back to total visible stars
                     stars_original = sum(r['stars'] for r in original_rows)
                     stars_rerolled = sum(r['stars'] for r in rerolled_rows)
                     choose_rerolled = stars_rerolled > stars_original
