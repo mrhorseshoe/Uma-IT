@@ -755,7 +755,11 @@ async function runAgain() {
   if (!task) return;
   $("start").disabled = true;
   try {
-    await writeTask(Object.assign({}, task.detail, { loops_done: 0 }));
+    /* consecutive_failures too: three in a row stop the loop, and a user
+       pressing Run again means "start fresh", not "start one failure from
+       stopping again". */
+    await writeTask(Object.assign({}, task.detail,
+                                  { loops_done: 0, consecutive_failures: 0 }));
     await refresh();
     const res = await api("/action/bot/start", { method: "POST" });
     if (!res.ok) throw new Error("HTTP " + res.status);
