@@ -74,7 +74,12 @@ class FakeCtx:
 
 print("the skills database ships with the project")
 db = load_skills_database()
-check("it loads", len(db) > 1000, f"{len(db)} names")
+# The floor used to be 1,000, sized to a 1,536-entry wiki scrape. The shipped
+# list is now pruned to what the game's own database has - 521 entries covering
+# all 520 of its distinct skills - so the old floor measured the scrape rather
+# than the thing it was guarding, which is "the file loaded and is not
+# truncated". Sized to the game instead, with room for it to grow.
+check("it loads", len(db) > 400, f"{len(db)} names")
 check("OCR of a symbol-suffixed name canonicalises",
       get_canonical_skill_name("Corner Acceleration O") == "Corner Acceleration",
       get_canonical_skill_name("Corner Acceleration O"))

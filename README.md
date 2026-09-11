@@ -186,7 +186,8 @@ the game's `Corner Acceleration ○`, and refuses outright if the database reads
 back implausibly small rather than emptying your list.
 
 **Your list is yours.** The repository ships a baseline at
-`resource/uma_it/skills.json` and never receives updates; a sync writes to
+`resource/uma_it/skills.json` — 521 entries covering every skill the game had in
+September 2026 — and never receives updates; a sync writes to
 `userdata/skills.json`, which is gitignored and shadows the shipped one. Keeping
 it current after a game update is up to you. Delete that file to fall back to
 the baseline.
