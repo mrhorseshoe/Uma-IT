@@ -88,7 +88,10 @@ def skills_source():
     found = skills_db.resolve()
     return {"remembered": skills_db.remembered_source(),
             "found": found,
-            "using_user_list": skills_db.active_path() == skills_db.USER_PATH}
+            "using_user_list": skills_db.active_path() == skills_db.USER_PATH,
+            # What the list in force was built from, so the page can say which
+            # game version it is current to without a second request.
+            "meta": skills_db.read_meta()}
 
 
 @server.post("/api/skills/sync")

@@ -284,6 +284,9 @@ pre#log {
           <button type="button" class="quiet danger" id="skills-prune">Remove unknown</button>
         </div>
         <div class="presetbox">
+          <span class="hint" id="skills-version"></span>
+        </div>
+        <div class="presetbox">
           <span class="hint" id="skills-sync-note"></span>
         </div>
         <!-- Shown only when the game database is not where it usually is. A
@@ -474,6 +477,25 @@ async function loadSkillNames() {
    A browser cannot give the server a filesystem path - a folder picker returns
    a handle, not a path, and the server is what opens the file. So the first
    press tries the usual location, and only asks if that fails. */
+/* Which game version the list is current to. Shown next to the buttons so it
+   is obvious when the list has fallen behind an update - the failure it
+   prevents is silent, a skill that simply never gets bought. */
+async function showSkillsVersion(meta) {
+  const el = $("skills-version");
+  try {
+    if (!meta) {
+      const src = await api("/api/skills/source").then((r) => r.json());
+      meta = src.meta;
+    }
+    if (!meta || !meta.skills) { el.textContent = ""; return; }
+    const ver = meta.game_version ? `game ${meta.game_version}` : "unknown game version";
+    const when = meta.master_mdb_date ? `, data ${meta.master_mdb_date}` : "";
+    el.textContent = `${meta.skills} skills, current to ${ver}${when}`;
+  } catch (e) {
+    el.textContent = "";
+  }
+}
+
 async function syncSkills(path) {
   const note = $("skills-sync-note");
   const btn = $("skills-sync");
@@ -500,6 +522,7 @@ async function syncSkills(path) {
       note.title = res.added.join(", ");
       await loadSkillNames();
     }
+    await showSkillsVersion(res.meta);
   } catch (e) {
     note.textContent = "Sync failed: " + e.message;
   } finally {
@@ -533,6 +556,7 @@ async function pruneSkills() {
       ? `Removed ${res.removed_count} unknown skill${res.removed_count === 1 ? "" : "s"} (${res.total} left)`
       : `Nothing to remove (${res.total} skills)`;
     if (res.removed_count) await loadSkillNames();
+    await showSkillsVersion(res.meta);
   } catch (e) {
     note.textContent = "Prune failed: " + e.message;
   } finally {
@@ -939,6 +963,7 @@ $("preset-save").onclick = savePreset;
 $("preset-delete").onclick = deletePreset;
 $("skills-sync").onclick = () => syncSkills("");
 $("skills-prune").onclick = pruneSkills;
+showSkillsVersion();
 $("skills-sync-go").onclick = () => syncSkills($("skills-sync-path").value.trim());
 loadPresets();
 $("skills").onchange = syncBlocks;

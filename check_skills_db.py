@@ -55,6 +55,23 @@ def fake_mdb(path, names):
     con.close()
 
 
+# The shipped list ships with a note saying which game version it was built
+# from. Checked before the paths below are redirected, because this is about the
+# real files in the repository. A count that has drifted from the list means the
+# note is describing something else.
+print("the shipped list says what it was built from")
+_shipped = json.load(open(skills_db.SHIPPED_PATH, encoding='utf-8'))
+try:
+    _meta = json.load(open(skills_db.META_SHIPPED, encoding='utf-8'))
+except Exception as e:
+    _meta = {}
+    print(f"  FAIL  the note exists   {e}")
+    failures.append("shipped meta exists")
+check("it names a game version", bool(_meta.get('game_version')), str(_meta))
+check("  and the count matches the list it describes",
+      _meta.get('skills') == len(_shipped),
+      f"note says {_meta.get('skills')}, list has {len(_shipped)}")
+
 # Run against a temporary userdata so a check never edits the real list.
 tmp = tempfile.mkdtemp(prefix="uma_it_skills_")
 skills_db.USER_PATH = os.path.join(tmp, 'skills.json')

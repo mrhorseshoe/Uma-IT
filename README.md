@@ -185,9 +185,15 @@ aliases of graded skills, since `Corner Acceleration` is what OCR produces for
 the game's `Corner Acceleration ○`, and refuses outright if the database reads
 back implausibly small rather than emptying your list.
 
+The line above the buttons says which game version the list is current to —
+`521 skills, current to game 1.35.0, data 2026-09-03`. The failure this prevents
+is a silent one: a skill added by an update simply never gets bought, and
+nothing says why. If that line is behind the version you are running, press the
+button.
+
 **Your list is yours.** The repository ships a baseline at
-`resource/uma_it/skills.json` — 521 entries covering every skill the game had in
-September 2026 — and never receives updates; a sync writes to
+`resource/uma_it/skills.json` — 521 entries covering every skill in game version
+**1.35.0** — and never receives updates; a sync writes to
 `userdata/skills.json`, which is gitignored and shadows the shipped one. Keeping
 it current after a game update is up to you. Delete that file to fall back to
 the baseline.

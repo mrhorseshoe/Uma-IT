@@ -25,9 +25,12 @@ near-duplicates compete with the real entry and make matching worse.
 than trusted to be exact - people know where they installed the game, not which
 subfolder Cygames keeps its database in.
 """
+import datetime
 import json
 import os
+import re
 import sqlite3
+import subprocess
 
 import bot.base.log as logger
 
@@ -36,6 +39,12 @@ log = logger.get_logger(__name__)
 # The repository's baseline, and the user's own copy which shadows it.
 SHIPPED_PATH = os.path.join('resource', 'uma_it', 'skills.json')
 USER_PATH = os.path.join('userdata', 'skills.json')
+
+# What the list was built from, shadowed the same way. Kept beside the list
+# rather than inside it: the list is a plain array that several things read,
+# and a header object would be an entry every one of them has to skip.
+META_SHIPPED = os.path.join('resource', 'uma_it', 'skills_meta.json')
+META_USER = os.path.join('userdata', 'skills_meta.json')
 
 # Where the chosen master.mdb location is remembered between presses.
 CONFIG_PATH = os.path.join('userdata', 'skills_db_source.json')
@@ -108,6 +117,74 @@ def save_all(skills: list) -> None:
     with open(USER_PATH, 'w', encoding='utf-8') as f:
         # ensure_ascii=False: skill names carry ♪, ○, × and accented letters.
         json.dump(skills, f, ensure_ascii=False, indent=1)
+
+
+def game_version() -> str:
+    """The installed client's version, or '' when it cannot be asked.
+
+    `master.mdb` carries no version of its own - there is no version table in
+    it - so the number a user would recognise has to come from the package
+    manager on the device. Best-effort: the list is still correct without it,
+    and a sync must not fail because the emulator is closed.
+    """
+    try:
+        adb = os.path.join('deps', 'adb', 'adb.exe')
+        if not os.path.isfile(adb):
+            return ''
+        device = ''
+        try:
+            import config
+            device = ((config.CONFIG or {}).get('bot', {}).get('auto', {})
+                      .get('adb', {}).get('device_name', '')) or ''
+        except Exception:
+            pass
+        cmd = [adb] + (['-s', device] if device else []) + [
+            'shell', 'dumpsys', 'package', 'com.cygames.umamusume']
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        m = re.search(r'versionName=(\S+)', out.stdout or '')
+        return m.group(1) if m else ''
+    except Exception as e:
+        log.debug(f"Could not read the game version: {e}")
+        return ''
+
+
+def read_meta() -> dict:
+    """What the active list was built from - the user's note, else the repo's."""
+    for path in (META_USER, META_SHIPPED):
+        # Only the note that belongs to the list in force.
+        if path == META_USER and active_path() != USER_PATH:
+            continue
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            continue
+    return {}
+
+
+def write_meta(mdb_path: str, count: int, action: str) -> dict:
+    """Record what the list was just built from, beside the list itself."""
+    try:
+        stamp = datetime.datetime.fromtimestamp(
+            os.path.getmtime(mdb_path)).strftime('%Y-%m-%d')
+    except Exception:
+        stamp = ''
+    meta = {
+        'game_version': game_version(),
+        'master_mdb_date': stamp,
+        'skills': count,
+        'updated': datetime.date.today().isoformat(),
+        'action': action,
+    }
+    try:
+        os.makedirs(os.path.dirname(META_USER), exist_ok=True)
+        with open(META_USER, 'w', encoding='utf-8') as f:
+            json.dump(meta, f, ensure_ascii=False, indent=1)
+    except Exception as e:
+        log.warning(f"Could not record the skill list version: {e}")
+    return meta
 
 
 def remembered_source() -> str:
@@ -254,10 +331,11 @@ def prune(hint: str = '') -> dict:
         save_all(kept)
         reset_skills_database_cache()
     remember_source(mdb)
+    meta = write_meta(mdb, len(kept), 'pruned')
     log.info(f"Skill list pruned against {mdb}: {len(removed)} removed, "
-             f"{len(kept)} kept")
+             f"{len(kept)} kept (game {meta.get('game_version') or '?'})")
     return {'ret': 0, 'source': mdb, 'removed': removed,
-            'removed_count': len(removed), 'total': len(kept)}
+            'removed_count': len(removed), 'total': len(kept), 'meta': meta}
 
 
 def sync(hint: str = '') -> dict:
@@ -304,7 +382,8 @@ def sync(hint: str = '') -> dict:
         reset_skills_database_cache()
 
     remember_source(mdb)
+    meta = write_meta(mdb, len(existing), 'synced')
     log.info(f"Skill list synced from {mdb}: {len(added)} new, "
-             f"{len(existing)} total")
+             f"{len(existing)} total (game {meta.get('game_version') or '?'})")
     return {'ret': 0, 'source': mdb, 'added': added,
-            'added_count': len(added), 'total': len(existing)}
+            'added_count': len(added), 'total': len(existing), 'meta': meta}
