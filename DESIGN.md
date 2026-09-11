@@ -188,6 +188,25 @@ None of these is obvious from reading the code. All are load-bearing.
    simply not enough. `read_body` now reads the sentence under the header, and
    the decline logs what it read so a third `Confirm` prompt is visible the
    first time it appears rather than after a run.
+10. **A click point is only safe on the screen it was measured on.**
+    `CONFIRMATION_LEARNSKILL_BUTTON` is a crop of the **Learn** button on the
+    "Learn the above skills?" dialog, so it matches that dialog and nothing
+    else — but the manifest called it a second crop of the skill screen and
+    pointed both at `script_learn_skill`. Arriving there with the buying pass
+    done takes the `_leave` branch, which clicks Back at **(90, 1190)**. On the
+    skill screen that is the Back button; under this dialog it is **Cancel**.
+
+    So every purchase this project ever made was cancelled by the bot itself.
+    The game then asked "Exit without learning skills?", `collect.py` saw
+    skills had been selected and went back for another pass, and it looped: one
+    career on 11 Sep made five passes over the same 4108 points and learned
+    none. **The tell was in the logs from the first pass — the skill point
+    total read 4108 at the start of every one** — and it was read past twice.
+    A repeated identical reading is a measurement, not a coincidence.
+
+    Two habits come out of this. Name the screen a template actually matches,
+    not the screen it sits on top of; and when a handler is reused for two
+    screens, check every point it clicks against both.
 
 ## Not verified against the live game
 
