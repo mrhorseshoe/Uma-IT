@@ -235,6 +235,16 @@ def find_support_card(ctx, img):
     The title is fuzzy-matched at 0.7 against the name saved in the task, which
     is why that name has to match the game exactly - it is OCR'd off the card.
     The in-game master database is the source of truth for those names.
+
+    **There is no level filter.** The parent read the card's level off the row
+    and skipped anything below a configured minimum. Two careers on 10 Sep 2026
+    showed why that was not worth keeping: it read level 150 for a card that
+    caps at 50, so the filter passed everything and was doing nothing - and a
+    genuinely low card misread the same way would have passed too. The owner
+    only follows players with max-level cards, so the check protected against
+    nothing real while adding an OCR read that could only be wrong. The name
+    match, which scored 0.97 and 1.00 on those careers, is what actually
+    selects the card.
     """
     detail = ctx.task.detail
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -247,30 +257,16 @@ def find_support_card(ctx, img):
         # blank this label so the next pass finds the next card
         img[pos[0][1]:pos[1][1], pos[0][0]:pos[1][0]] = 0
 
-        level_img = cv2.copyMakeBorder(card[125:145, 68:111], 20, 20, 20, 20,
-                                       cv2.BORDER_CONSTANT, None, (255, 255, 255))
         name_img = cv2.copyMakeBorder(card[63:94, 132:439], 20, 20, 20, 20,
                                       cv2.BORDER_CONSTANT, None, (255, 255, 255))
-
-        level_text = ocr_line(level_img)
-        if not level_text:
-            continue
-        digits = re.sub(r'\D', '', level_text)
-        if not digits:
-            log.info("Borrow list: skipping a card whose level could not be read")
-            continue
-        if int(digits) < detail.follow_support_card_level:
-            continue
-
         title = ocr_line(name_img)
         score = SequenceMatcher(None, title, detail.follow_support_card_name).ratio()
         if score > 0.7:
             log.info(f"Borrow list: matched {title!r} to "
-                     f"{detail.follow_support_card_name!r} at {score:.2f}, "
-                     f"level {digits} - taking it")
+                     f"{detail.follow_support_card_name!r} at {score:.2f} - taking it")
             ctx.ctrl.click(match_result.center_point[0],
                            match_result.center_point[1] - 75,
-                           f"Borrow {detail.follow_support_card_name} (level {digits})")
+                           f"Borrow {detail.follow_support_card_name}")
             return True
 
 

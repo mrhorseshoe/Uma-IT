@@ -36,7 +36,6 @@ def check(label, cond, detail=""):
 REAL = {
     "scenario": 4,
     "follow_support_card_name": "Wave of Gratitude",
-    "follow_support_card_level": 50,
     "use_last_parents": True,
     "loop_count": 0,
     "loops_done": 26,

@@ -188,8 +188,7 @@ def script_support_card_select(ctx):
     if image_match(ctx.ctrl.get_screen(to_gray=True),
                    REF_CULTIVATE_SUPPORT_CARD_EMPTY).find_match:
         log.info(f"Support deck: borrow slot empty - looking for "
-                 f"{ctx.task.detail.follow_support_card_name!r} "
-                 f"at level {ctx.task.detail.follow_support_card_level}+")
+                 f"{ctx.task.detail.follow_support_card_name!r}")
         ctx.ctrl.click_by_point(TO_FOLLOW_SUPPORT_CARD_SELECT)
         return
     log.info("Support deck: borrow slot already filled - going on")
@@ -239,9 +238,8 @@ def script_follow_support_card_select(ctx):
         ctx.ctrl.click_by_point(FOLLOW_SUPPORT_CARD_SELECT_REFRESH)
         time.sleep(1.2)
 
-    log.warning(f"Borrow list: {ctx.task.detail.follow_support_card_name!r} at level "
-                f"{ctx.task.detail.follow_support_card_level}+ not found after "
-                f"{BORROW_REFRESHES} refreshes - starting without it")
+    log.warning(f"Borrow list: {ctx.task.detail.follow_support_card_name!r} not "
+                f"found after {BORROW_REFRESHES} refreshes - starting without it")
     ctx.ctrl.click_by_point(FOLLOW_SUPPORT_CARD_SELECT_REFRESH)
 
 

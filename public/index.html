@@ -234,10 +234,6 @@ pre#log {
       <input type="text" id="card" placeholder="Wave of Gratitude">
     </div>
     <div class="field">
-      <label for="level">Minimum card level</label>
-      <input type="number" id="level" min="0" max="50" value="50">
-    </div>
-    <div class="field">
       <label for="loops">Run limit
         <span class="hint">0 runs until stopped</span>
       </label>
@@ -536,7 +532,6 @@ function renderTask() {
   $("summary").innerHTML = [
     ["Scenario", SCENARIOS[d.scenario] || d.scenario],
     ["Card", d.follow_support_card_name || "any"],
-    ["Min level", d.follow_support_card_level],
     ["Legacy", d.use_last_parents ? "keep last" : "auto-select"],
     ["Skills", d.skip_learn_skill ? "skipped" : "requested"],
     ["TP", d.allow_recover_tp ? "may spend" : "never spend"],
@@ -565,7 +560,6 @@ function openForm() {
   const d = (task && task.detail) || {};
   $("scenario").value = String(d.scenario ?? 4);
   $("card").value = d.follow_support_card_name || "";
-  $("level").value = d.follow_support_card_level ?? 50;
   $("loops").value = d.loop_count ?? 0;
   $("parents").checked = d.use_last_parents ?? true;
   $("skills").checked = d.skip_learn_skill ?? true;
@@ -605,7 +599,6 @@ async function saveTask(ev) {
   const payload = {
     scenario: Number($("scenario").value),
     follow_support_card_name: $("card").value.trim(),
-    follow_support_card_level: Number($("level").value) || 0,
     loop_count: Number($("loops").value) || 0,
     // Carried forward so editing a task does not reset the run count.
     loops_done: (task && task.detail && task.detail.loops_done) || 0,

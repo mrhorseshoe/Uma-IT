@@ -43,8 +43,11 @@ class TaskDetail:
     # -- the career to start ------------------------------------------------
     scenario: ScenarioType
     follow_support_card_name: str
-    follow_support_card_level: int
     use_last_parents: bool
+    # No `follow_support_card_level`. It gated the borrow on a level OCR'd off
+    # the card row, and that read gave 150 for a card that caps at 50 - so it
+    # passed everything, and would have passed a low card misread the same way.
+    # The name match selects the card; see find_support_card.
 
     # -- the loop -----------------------------------------------------------
     loop_count: int          # 0 = run until stopped
@@ -148,7 +151,6 @@ def build_task(task_execute_mode: TaskExecuteMode, task_type: int,
 
     td.scenario = ScenarioType(_int(data.get('scenario'), 0, 0, 4))
     td.follow_support_card_name = str(data.get('follow_support_card_name') or '')
-    td.follow_support_card_level = _int(data.get('follow_support_card_level'), 50, 0)
     td.use_last_parents = bool(data.get('use_last_parents', False))
 
     td.loop_count = _int(data.get('loop_count'), 0, 0)
