@@ -2,9 +2,10 @@
 
 Two kinds of assertion here.
 
-The **choice** - priority order, affordability, and the rule that stops at the
-first tier nothing is affordable in, which is what keeps a cheap tier-2 skill
-from being bought instead of saving toward tier 1.
+The **choice** - priority order first, then spending whatever is left. Points
+not spent at the end of a career are lost, so the assertions here are mostly
+about not stopping early: an unaffordable skill must not end its tier, and an
+unaffordable tier must not end the search.
 
 The **copy** - the buying pass removes skills from the priority list as it
 learns them. In this project that list is a task setting, and task settings are
@@ -85,8 +86,46 @@ chosen, _, spent = skills_mod._choose(
 check("buys across tiers when it can afford both", chosen == ['a', 'b'], str(chosen))
 check("  and adds up the cost", spent == 200, str(spent))
 
-chosen, _, _ = skills_mod._choose([skill('a', 400, 0), skill('b', 100, 1)], tiers, 300)
-check("stops rather than skipping to a cheaper lower tier", chosen == [], str(chosen))
+# Points not spent at the end of a career are lost, so an unaffordable skill
+# must never stop the search. The parent breaks on both counts, and measured
+# against the built-in list a 300-point budget facing a 400-point skill bought
+# nothing at all - twice over, with affordable skills right there.
+chosen, _, spent = skills_mod._choose([skill('a', 400, 0), skill('b', 100, 1)], tiers, 300)
+check("an unaffordable top tier does not stop the lower ones",
+      chosen == ['b'] and spent == 100, f"{chosen} {spent}")
+
+chosen, _, spent = skills_mod._choose(
+    [skill('dear', 400, 0, hint=3), skill('cheap', 50, 0)], [['dear', 'cheap']], 300)
+check("an unaffordable skill does not stop the rest of its own tier",
+      chosen == ['cheap'] and spent == 50, f"{chosen} {spent}")
+
+# The filler must only ever take budget the good skills declined.
+chosen, _, _ = skills_mod._choose(
+    [skill('low', 100, 2), skill('top', 100, 0)], [['top'], [], ['low']], 500)
+check("priority order still decides who buys first", chosen == ['top', 'low'],
+      str(chosen))
+
+# Whatever is left must be smaller than the cheapest thing still on offer -
+# that is what "no points left on the table" means, checkably.
+pool = [skill('A', 180, 0, hint=3), skill('B', 160, 0, hint=1), skill('C', 120, 1),
+        skill('D', 90, 1), skill('E', 70, 2), skill('F', 45, 3), skill('G', 30, 3)]
+chosen, _, spent = skills_mod._choose(pool, [['A', 'B'], ['C', 'D'], ['E']], 500)
+unbought = [x['skill_cost'] for x in pool if x['skill_name'] not in chosen]
+check("nothing affordable is left unbought",
+      not unbought or (500 - spent) < min(unbought),
+      f"{500 - spent} left, cheapest unbought {min(unbought) if unbought else None}")
+
+# learn_skill_only_user_provided has to actually restrict. get_skill_list files
+# unnamed skills one tier past the end, and without this they were bought too.
+listed = [skill('named', 100, 0), skill('unnamed', 50, 1)]
+chosen, _, _ = skills_mod._choose(listed, [['named']], 500, only_listed=True)
+check("only-what-I-list leaves the unlisted bucket alone", chosen == ['named'],
+      str(chosen))
+for x in listed:
+    x['available'] = True
+chosen, _, _ = skills_mod._choose(listed, [['named']], 500, only_listed=False)
+check("  and without it the leftovers are spent on unlisted skills",
+      chosen == ['named', 'unnamed'], str(chosen))
 
 chosen, _, _ = skills_mod._choose(
     [skill('x', 100, 0, hint=0), skill('y', 100, 0, hint=3)], [['x', 'y']], 100)

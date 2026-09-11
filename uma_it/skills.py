@@ -77,15 +77,32 @@ def _read_skill_points(ctx) -> int:
     return int(digits) if digits else 0
 
 
-def _choose(skills, wanted, budget):
-    """Pick what to buy: priority order, highest hint level first, within budget.
+def _choose(skills, wanted, budget, only_listed=False):
+    """Pick what to buy: priority order first, then spend what is left over.
 
-    Stops at the first priority level nothing affordable was found in, which is
-    what keeps a cheap low-priority skill from being bought ahead of saving for
-    the tier above it.
+    Every tier is considered, and within a tier an unaffordable skill is
+    skipped rather than ending the tier. That is the difference between this
+    and the parent, which breaks on both counts - so one expensive skill early
+    in a tier stopped the whole tier, and one unaffordable tier stopped every
+    tier below it. Measured: a 300-point budget facing a 400-point skill bought
+    nothing at all, twice over, with affordable skills sitting right there.
+
+    Nothing is being saved for later. This runs at the end of a career, so a
+    point not spent here is lost.
+
+    Order still matters: tiers are visited in order and, within a tier, highest
+    hint level first, so cheap filler can only take budget the good skills had
+    already declined.
+
+    `only_listed` stops at the last tier the user named, leaving the
+    everything-else bucket unbought - which is what
+    `learn_skill_only_user_provided` asks for.
     """
     chosen, chosen_raw, spent = [], [], 0
-    for level in range(len(wanted) + 1):
+    # get_skill_list files anything the user did not name one past the last
+    # tier, so that bucket is the natural last stop.
+    levels = len(wanted) if only_listed else len(wanted) + 1
+    for level in range(levels):
         at_level = sorted(
             [s for s in skills if s["priority"] == level and s["available"] is True],
             key=lambda s: -int(s.get("hint_level", 0)))
@@ -93,14 +110,13 @@ def _choose(skills, wanted, budget):
             # Re-checked inside the loop, not just when at_level was built: a
             # gold skill bought earlier in this same tier marks the skill below
             # it unavailable, and the parent misses that because it filters
-            # once up front. Across tiers it works there; within one it buys
-            # both and wastes the points.
+            # once up front.
             if skill["available"] is not True:
                 continue
             if spent + skill["skill_cost"] > budget:
-                log.debug(f"Cannot afford {skill['skill_name']!r} "
-                          f"({skill['skill_cost']}, {budget - spent} left)")
-                break
+                log.debug(f"Skipping {skill['skill_name']!r} - costs "
+                          f"{skill['skill_cost']}, {budget - spent} left")
+                continue
             spent += skill["skill_cost"]
             chosen.append(skill["skill_name"])
             chosen_raw.append(skill["skill_name_raw"])
@@ -112,9 +128,6 @@ def _choose(skills, wanted, budget):
                 for other in skills:
                     if other["skill_name"] == skill["subsequent_skill"]:
                         other["available"] = False
-        if at_level and not any(s["skill_name"] in chosen for s in at_level):
-            log.debug(f"Nothing affordable at priority {level} - stopping here")
-            break
     return chosen, chosen_raw, spent
 
 
@@ -158,9 +171,25 @@ def script_learn_skill(ctx):
     budget = _read_skill_points(ctx)
     log.info(f"{budget} skill points, {len(skills)} skills on the screen")
 
-    chosen, chosen_raw, spent = _choose(skills, wanted, budget)
+    only_listed = bool(getattr(detail, 'learn_skill_only_user_provided', False))
+    chosen, chosen_raw, spent = _choose(skills, wanted, budget, only_listed)
     log.info(f"Buying {len(chosen)} skill(s) for {spent} points: "
              f"{', '.join(chosen) if chosen else 'none'}")
+
+    # Say what is left, and whether anything could still have been bought with
+    # it. "Do not leave points on the table" is only checkable if the log says
+    # how many were left over.
+    left = budget - spent
+    affordable = [x for x in skills
+                  if x["available"] is True and x["skill_name"] not in chosen
+                  and x["skill_cost"] <= left
+                  and (not only_listed or x["priority"] < len(wanted))]
+    if affordable:
+        log.warning(f"{left} skill points unspent with {len(affordable)} skill(s) "
+                    f"still affordable - cheapest "
+                    f"{min(x['skill_cost'] for x in affordable)}")
+    else:
+        log.info(f"{left} skill points unspent; nothing left costs that little")
 
     # Align the list back to the top before clicking.
     ctx.ctrl.swipe(x1=23, y1=950, x2=23, y2=968, duration=100, name="align the skill list")
