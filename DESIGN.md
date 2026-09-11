@@ -177,6 +177,17 @@ None of these is obvious from reading the code. All are load-bearing.
    `'Final Confirmation'`; against a table holding only titles we act on, ours
    wins the career-start dialog and **no career ever starts**. The 36
    distractor titles earn their place by losing. Pinned by `check_titles.py`.
+9. **`'Confirm'` is two unrelated prompts, and only the body separates them.**
+   The game titles both the TP restore offer and the skill screen's
+   "Exit without learning skills?" prompt `Confirm`. Routing the title straight
+   to the TP handler ended every career of the 11 Sep run the moment its skills
+   were bought: the bot read a prompt raised by its own Back click as an
+   out-of-TP offer and failed the run. Three loops burned in three minutes, each
+   re-entering the skill screen the last had never left, and the logs said
+   "TP restore offered" with TP in hand. Matching was never wrong — a title was
+   simply not enough. `read_body` now reads the sentence under the header, and
+   the decline logs what it read so a third `Confirm` prompt is visible the
+   first time it appears rather than after a run.
 
 ## Not verified against the live game
 

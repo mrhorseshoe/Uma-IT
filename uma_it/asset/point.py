@@ -44,6 +44,10 @@ CULTIVATE_FINISH_RETURN_CONFIRM = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COO
 CULTIVATE_LEARN_SKILL_CONFIRM = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE,None, Coordinate(360,1082), "Skill Learning - Confirm", None)
 CULTIVATE_LEARN_SKILL_CONFIRM_AGAIN = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE,None, Coordinate(516,1185), "Skill Learning - Confirm Again", None)
 RETURN_TO_CULTIVATE_FINISH = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(90, 1190), "Return to Cultivation Interface", None)
+# The "Exit without learning skills?" prompt raised by the Back click above.
+# Its title is 'Confirm', which the TP prompt also uses, so dialogs.py tells
+# them apart by body text before choosing between this and a failed career.
+EXIT_WITHOUT_LEARNING_SKILLS_OK = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(520, 835), "Exit Without Learning Skills - OK", None)
 CULTIVATE_LEVEL_RESULT_CONFIRM = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(360, 1175), "Cultivation Level - Next Page", None)
 CULTIVATE_FACTOR_RECEIVE_CONFIRM = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(360, 1175), "Factor Acquisition - Next Page", None)
 CULTIVATE_FACTOR_REROLL_SKIP = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(513, 1178), "Spark Reroll - Confirm Without Rerolling", None)

@@ -45,6 +45,7 @@ from uma_it.asset.template import UI_INFO, REF_NEXT
 from uma_it.asset.dialog_titles import ALL_TITLES
 from uma_it.parse import is_spark_selection_screen
 from uma_it.asset.point import (
+    EXIT_WITHOUT_LEARNING_SKILLS_OK,
     ESCAPE,
     CULTIVATE_FINISH_RETURN_CONFIRM,
     CULTIVATE_FINISH_CONFIRM_AGAIN,
@@ -148,7 +149,32 @@ def _career_complete(ctx):
     time.sleep(1)
 
 
-def _tp_recovery(ctx):
+def _confirm(ctx):
+    """The 'Confirm' title, which the game puts on two unrelated prompts.
+
+    One is the TP restore offer. The other is "Exit without learning skills?",
+    raised by the Back click `skills._leave` makes on its way off the skill
+    screen - so it appears once per career, but only when skill buying is on.
+
+    Routing both to `_tp_recovery` ended every career of the 11 Sep run the
+    moment its skills were bought: the bot read a prompt it had raised itself
+    as an out-of-TP offer, declined it, and failed the run. Three loops burned
+    in three minutes, each one re-entering the skill screen the last had never
+    left. The title match was never wrong; the title is simply not enough, and
+    the body is what separates them.
+    """
+    career = getattr(ctx, 'career', None)
+    header = getattr(career, 'dialog_header_pos', None)
+    body = read_body(ctx, header) if header else ''
+    if 'learning skill' in body.lower():
+        log.info(f"Skill screen exit prompt ({body!r}) - confirming")
+        ctx.ctrl.click_by_point(EXIT_WITHOUT_LEARNING_SKILLS_OK)
+        time.sleep(1)
+        return
+    _tp_recovery(ctx, body)
+
+
+def _tp_recovery(ctx, body: str = ''):
     """The TP prompt, and the decision behind it.
 
     This is how the loop ends when the account runs dry: Independent Training
@@ -162,13 +188,12 @@ def _tp_recovery(ctx):
     frames appear in its logs with nothing acting on them.
     """
     if not tp.allowed(ctx):
-        log.info("TP restore offered - declining and failing the career "
-                 "(allow_recover_tp is 0)")
+        log.info(f"TP restore offered ({body!r}) - declining and failing the "
+                 f"career (allow_recover_tp is 0)")
         ctx.task.end_task(TaskStatus.TASK_STATUS_FAILED, EndTaskReason.TP_NOT_ENOUGH)
         return
     career = getattr(ctx, 'career', None)
     header = getattr(career, 'dialog_header_pos', None)
-    body = ''
     if not tp.step(ctx, body, header):
         log.warning("TP restore could not proceed - failing the career")
         ctx.task.end_task(TaskStatus.TASK_STATUS_FAILED, EndTaskReason.TP_NOT_ENOUGH)
@@ -222,12 +247,11 @@ DIALOGS = {
     'Race Details': _tap(CULTIVATE_GOAL_RACE_INTER_3, "Race Details - confirming"),
 
     # -- running out of TP, which is how the loop stops ----------------------
-    # 'Confirm' is the decision. 'Recover TP' is the offer screen behind it,
-    # which the parent knows and deliberately does not act on - its branch is
-    # commented out - so neither does this.
-    # 'Confirm' is the prompt; 'Recover TP' is the screen behind it. Both go
-    # to the same stepper, which recognises whichever screen it is looking at.
-    'Confirm':      _tp_recovery,
+    # 'Recover TP' is the offer screen; 'Confirm' is the prompt in front of it,
+    # and also the title of the skill screen's exit prompt, so it goes through
+    # a body-text check first. Both reach the same stepper, which recognises
+    # whichever screen it is looking at.
+    'Confirm':      _confirm,
     'Recover TP':   _tp_recovery,
 
     # -- known, occurs, and the parent has no branch for it ------------------
@@ -291,6 +315,23 @@ def read_title(ctx):
         # to bound its colour search below the header
         career.dialog_header_pos = pos
     return text
+
+
+def read_body(ctx, header_pos) -> str:
+    """The dialog's body text, read below the header.
+
+    Only needed where the title does not identify the prompt. Measured on the
+    stuck frame of 11 Sep: with the header box at ((8, 391), (136, 440)), the
+    body sits at y 616 and the buttons at y 834, so a window of 60-300 below
+    the header holds the sentence and nothing else.
+    """
+    try:
+        img = cv2.cvtColor(ctx.current_screen, cv2.COLOR_BGR2GRAY)
+        bottom = header_pos[1][1]
+        return (ocr_line(img[bottom + 60:bottom + 300, 30:690]) or '').strip()
+    except Exception as e:
+        log.debug(f"Dialog body unreadable: {e}")
+        return ''
 
 
 def script_dialog(ctx):

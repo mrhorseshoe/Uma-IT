@@ -17,7 +17,8 @@ import numpy as np
 
 import uma_it.dialogs as dialogs
 from uma_it.asset.point import (ESCAPE, TO_RECOVER_TP, CULTIVATE_FINISH_RETURN_CONFIRM,
-                                TO_CULTIVATE_PREPARE_NEXT)
+                                TO_CULTIVATE_PREPARE_NEXT,
+                                EXIT_WITHOUT_LEARNING_SKILLS_OK)
 from uma_it.context import CareerContext
 from uma_it.task import build_task, EndTaskReason
 from bot.base.task import TaskExecuteMode, TaskStatus
@@ -58,10 +59,16 @@ class FakeCtx:
         self.task.end_task = lambda status, reason: self.ended.append((status, reason))
 
 
-def route(title, **settings):
-    """Run one frame through the router with the title read already decided."""
+def route(title, body='', **settings):
+    """Run one frame through the router with the title read already decided.
+
+    `body` matters only for 'Confirm', the one title the game reuses across
+    unrelated prompts.
+    """
     ctx = FakeCtx(**settings)
     dialogs.read_title = lambda _ctx: title
+    dialogs.read_body = lambda _ctx, _pos: body
+    ctx.career.dialog_header_pos = ((8, 391), (136, 440))
     dialogs.script_dialog(ctx)
     return ctx
 
@@ -91,6 +98,25 @@ ctx = route('Confirm', allow_recover_tp=2)
 check("accepts when the task authorises spending",
       ctx.ctrl.clicks == [NAME(TO_RECOVER_TP)], str(ctx.ctrl.clicks))
 check("  and does not end the career", ctx.ended == [], str(ctx.ended))
+
+# 'Confirm' is also the skill screen's exit prompt, raised by the Back click
+# `skills._leave` makes itself. Reading that as a TP offer ended every career of
+# the 11 Sep run the moment its skills were bought - three loops in three
+# minutes, each re-entering the skill screen the last had never left. The title
+# was matched correctly; a title is simply not enough to tell them apart.
+print("\n'Confirm' is two prompts, told apart by body text")
+ctx = route('Confirm', body='Exit without learning skills?', allow_recover_tp=0)
+check("the skill exit prompt is confirmed",
+      ctx.ctrl.clicks == [NAME(EXIT_WITHOUT_LEARNING_SKILLS_OK)], str(ctx.ctrl.clicks))
+check("  and the career is not failed over it", ctx.ended == [], str(ctx.ended))
+
+ctx = route('Confirm', body='Exit without learning skills?', allow_recover_tp=2)
+check("  nor is it mistaken for TP with spending on",
+      ctx.ctrl.clicks == [NAME(EXIT_WITHOUT_LEARNING_SKILLS_OK)], str(ctx.ctrl.clicks))
+
+ctx = route('Confirm', body='Restore TP?', allow_recover_tp=0)
+check("a 'Confirm' that is not about skills still ends the loop",
+      [s for s, _ in ctx.ended] == [TaskStatus.TASK_STATUS_FAILED], str(ctx.ended))
 
 print("\nand the screen behind the prompt is driven, not left sitting")
 # This is where the parent stops: its handler for the Recover TP screen is
