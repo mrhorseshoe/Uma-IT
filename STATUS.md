@@ -239,7 +239,11 @@ py -3.10 check_tp.py
 py -3.10 check_scope.py
 ```
 
-All sixteen exit non-zero on failure. Run them after touching anything under
+```bash
+py -3.10 check_presets.py
+```
+
+All seventeen exit non-zero on failure. Run them after touching anything under
 `uma_it/` or `bot/`.
 
 ## Running it

@@ -11,7 +11,7 @@ is a logged warning, never a silent drop - the parent project printed to stdout
 and moved on, which meant an unhandled screen looked exactly like a handled
 one.
 """
-from typing import Callable, Dict
+from typing import Any, Callable, Dict
 
 from bot.base.manifest import AppManifest
 from bot.base.resource import NOT_FOUND_UI, UI
@@ -46,8 +46,56 @@ from uma_it.context import build_context
 from uma_it.dialogs import script_dialog, script_not_found_ui
 from uma_it.screens import scan_ui_list
 from uma_it.task import APP_NAME, UmaItTaskType, build_task
+from uma_it import presets
 
 log = logger.get_logger(__name__)
+
+
+# --- routes this app adds to the engine's server --------------------------
+# Registered here rather than in bot/server/handler.py: presets are a thing
+# this app has, not something the engine should know about. Importing the
+# server at module scope is how the parent does it too.
+from bot.server.handler import server
+
+
+@server.get("/api/skill-presets")
+def list_skill_presets():
+    return presets.read_all()
+
+
+@server.post("/api/skill-presets")
+def save_skill_preset(preset: Dict[str, Any]):
+    try:
+        return {"ret": 0, "name": presets.write(preset)}
+    except Exception as e:
+        log.warning(f"Could not save skill preset: {e}")
+        return {"ret": 1, "msg": str(e)}
+
+
+@server.delete("/api/skill-presets")
+def delete_skill_preset(body: Dict[str, Any]):
+    return {"ret": 0, "deleted": presets.delete(body.get("name", ""))}
+
+
+def _keep_catch_all_last():
+    """Move the server's catch-all behind the routes registered here.
+
+    `bot/server/handler.py` ends with `@server.get("/{whatever:path}")`, which
+    serves the dashboard for any unmatched path. FastAPI matches in
+    registration order, and this module can only register after importing that
+    one - so without this, a GET added here is swallowed by the catch-all and
+    answers with index.html instead of JSON. POST and DELETE are unaffected,
+    the catch-all being GET-only, which is a confusing way to find out.
+
+    This is very likely why the parent project reads its presets over POST.
+    """
+    routes = server.router.routes
+    for route in [r for r in routes if getattr(r, 'path', '') == '/{whatever:path}']:
+        routes.remove(route)
+        routes.append(route)
+
+
+_keep_catch_all_last()
 
 # The Global client. Same package as the parent project - it is the same game.
 APP_PACKAGE_NAME = "com.cygames.umamusume"

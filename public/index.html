@@ -131,6 +131,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .block .field label { font-size: 13px; }
 
 .tagbox { flex: 1; min-width: 0; }
+.presetbox { display: flex; gap: 6px; align-items: center; }
+.presetbox select, .presetbox input[type=text] { width: 150px; }
+.presetbox button { padding: 7px 11px; }
 .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
 .chips:empty { display: none; }
 .chip {
@@ -252,6 +255,26 @@ pre#log {
       <span class="switch"><input type="checkbox" id="skills" checked><span></span></span>
     </div>
     <div class="block" id="skills-block" hidden>
+      <div class="field">
+        <label for="preset-select">Preset
+          <span class="hint">A saved set of priorities and blacklist</span>
+        </label>
+        <div class="presetbox">
+          <select id="preset-select"><option value="">No presets saved</option></select>
+          <button type="button" id="preset-load">Load</button>
+          <button type="button" class="quiet danger" id="preset-delete">Delete</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="preset-name">Save as
+          <span class="hint">An existing name overwrites it</span>
+        </label>
+        <div class="presetbox">
+          <input type="text" id="preset-name" placeholder="Preset name">
+          <button type="button" id="preset-save">Save</button>
+        </div>
+      </div>
+
       <div class="field">
         <label>Priority 1<span class="hint">Bought first, while points last</span></label>
         <div class="tagbox" id="tier0"></div>
@@ -419,6 +442,87 @@ async function loadSkillNames() {
     }));
   } catch (e) {
     // Autocomplete is a convenience; typing a name by hand still works.
+  }
+}
+
+let presetList = [];
+
+async function loadPresets(select) {
+  try {
+    presetList = await api("/api/skill-presets").then((r) => r.json());
+  } catch (e) {
+    presetList = [];
+  }
+  const sel = $("preset-select");
+  const keep = select || sel.value;
+  sel.replaceChildren();
+  if (!presetList.length) {
+    const o = document.createElement("option");
+    o.value = ""; o.textContent = "No presets saved";
+    sel.append(o);
+  } else {
+    for (const p of presetList) {
+      const o = document.createElement("option");
+      o.value = p.name;
+      o.textContent = `${p.name} (${p.tiers.reduce((a, t) => a + t.length, 0)})`;
+      sel.append(o);
+    }
+    if (keep && presetList.some((p) => p.name === keep)) sel.value = keep;
+  }
+  $("preset-load").disabled = !presetList.length;
+  $("preset-delete").disabled = !presetList.length;
+}
+
+/* Load a preset into the form. It does not save - the task is only changed
+   when the form is, which keeps "try a preset" from being destructive. */
+function applyPreset() {
+  const p = presetList.find((x) => x.name === $("preset-select").value);
+  if (!p) return;
+  for (let i = 0; i < 3; i++) tagBoxes["tier" + i].set(p.tiers[i] || []);
+  tagBoxes.blacklist.set(p.blacklist || []);
+  $("onlymine").checked = !!p.only_user_provided;
+  $("preset-name").value = p.name;
+  note(`Loaded preset "${p.name}" - save the task to keep it`);
+}
+
+async function savePreset() {
+  const name = ($("preset-name").value || $("preset-select").value || "").trim();
+  if (!name) { note("Give the preset a name first", true); return; }
+  if (presetList.some((p) => p.name === name) &&
+      !confirm(`Overwrite the preset "${name}"?`)) return;
+  try {
+    const res = await api("/api/skill-presets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        tiers: [0, 1, 2].map((i) => tagBoxes["tier" + i].get()),
+        blacklist: tagBoxes.blacklist.get(),
+        only_user_provided: $("onlymine").checked,
+      }),
+    });
+    const body = await res.json();
+    if (!res.ok || body.ret !== 0) throw new Error(body.msg || "HTTP " + res.status);
+    await loadPresets(body.name);
+    note(`Preset "${body.name}" saved`);
+  } catch (e) {
+    note("Could not save the preset: " + e.message, true);
+  }
+}
+
+async function deletePreset() {
+  const name = $("preset-select").value;
+  if (!name || !confirm(`Delete the preset "${name}"?`)) return;
+  try {
+    await api("/api/skill-presets", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    await loadPresets();
+    note(`Preset "${name}" deleted`);
+  } catch (e) {
+    note("Could not delete the preset: " + e.message, true);
   }
 }
 
@@ -731,6 +835,10 @@ $("finish").onclick = () => act("/action/bot/stop-after-run", "Will stop after t
 for (const id of ["tier0", "tier1", "tier2", "blacklist"]) tagBoxes[id] = new TagBox(id);
 buildSparks();
 loadSkillNames();
+$("preset-load").onclick = applyPreset;
+$("preset-save").onclick = savePreset;
+$("preset-delete").onclick = deletePreset;
+loadPresets();
 $("skills").onchange = syncBlocks;
 $("reroll").onchange = syncBlocks;
 $("mode-or").onclick = () => { sparkMode = "or"; renderSparks(); };

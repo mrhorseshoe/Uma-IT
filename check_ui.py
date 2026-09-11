@@ -28,7 +28,11 @@ def check(label, cond, detail=""):
 
 
 html = io.open(PAGE, encoding='utf-8').read()
-server_src = io.open('bot/server/handler.py', encoding='utf-8').read()
+# Routes live in two places: the engine's handler, and this app's manifest,
+# which registers the ones the engine has no business knowing about. Scanning
+# only the first made the app's own routes look like typos in the page.
+server_src = "\n".join(io.open(f, encoding='utf-8').read()
+                       for f in ('bot/server/handler.py', 'uma_it/manifest.py'))
 
 print("no network dependency")
 external = re.findall(r'''(?:src|href)\s*=\s*["'](https?:)?//[^"']+''', html)
