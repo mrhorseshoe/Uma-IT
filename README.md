@@ -177,6 +177,14 @@ looks in the usual place; if your install is somewhere else it asks for the
 folder, and remembers it afterwards. You can give it the game folder, the folder
 holding `master.mdb`, or the file itself.
 
+**Remove unknown** does the opposite: it drops entries for skills the game's
+database does not have. A scraped list carries names the game never shows, and
+they are not free — the matcher scores an OCR'd name against every candidate, so
+a name that cannot appear on screen can still win a frame. It keeps un-suffixed
+aliases of graded skills, since `Corner Acceleration` is what OCR produces for
+the game's `Corner Acceleration ○`, and refuses outright if the database reads
+back implausibly small rather than emptying your list.
+
 **Your list is yours.** The repository ships a baseline at
 `resource/uma_it/skills.json` and never receives updates; a sync writes to
 `userdata/skills.json`, which is gitignored and shadows the shipped one. Keeping

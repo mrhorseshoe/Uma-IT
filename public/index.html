@@ -281,6 +281,9 @@ pre#log {
         </label>
         <div class="presetbox">
           <button type="button" id="skills-sync">Update from game files</button>
+          <button type="button" class="quiet danger" id="skills-prune">Remove unknown</button>
+        </div>
+        <div class="presetbox">
           <span class="hint" id="skills-sync-note"></span>
         </div>
         <!-- Shown only when the game database is not where it usually is. A
@@ -499,6 +502,39 @@ async function syncSkills(path) {
     }
   } catch (e) {
     note.textContent = "Sync failed: " + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* Dropping entries for skills the game does not have. A scraped list carries
+   names the game never shows, and they are not free: the matcher scores an
+   OCR'd name against every candidate, so a name that cannot appear can still
+   win a frame. Confirmed first, because unlike the sync this one deletes. */
+async function pruneSkills() {
+  const note = $("skills-sync-note");
+  if (!confirm("Remove every skill the game's own database does not have?\n\n"
+               + "Your priorities and blacklist are not touched, and you can "
+               + "rebuild the list with Update from game files.")) return;
+  const btn = $("skills-prune");
+  btn.disabled = true;
+  note.textContent = "Comparing against the game database…";
+  try {
+    const res = await api("/api/skills/prune", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: "" }),
+    }).then((r) => r.json());
+    if (res.ret !== 0) {
+      note.textContent = res.msg || "Could not prune.";
+      return;
+    }
+    note.textContent = res.removed_count
+      ? `Removed ${res.removed_count} unknown skill${res.removed_count === 1 ? "" : "s"} (${res.total} left)`
+      : `Nothing to remove (${res.total} skills)`;
+    if (res.removed_count) await loadSkillNames();
+  } catch (e) {
+    note.textContent = "Prune failed: " + e.message;
   } finally {
     btn.disabled = false;
   }
@@ -902,6 +938,7 @@ $("preset-load").onclick = applyPreset;
 $("preset-save").onclick = savePreset;
 $("preset-delete").onclick = deletePreset;
 $("skills-sync").onclick = () => syncSkills("");
+$("skills-prune").onclick = pruneSkills;
 $("skills-sync-go").onclick = () => syncSkills($("skills-sync-path").value.trim());
 loadPresets();
 $("skills").onchange = syncBlocks;

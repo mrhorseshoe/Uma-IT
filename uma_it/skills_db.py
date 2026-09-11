@@ -211,6 +211,55 @@ def read_game_skills(mdb_path: str) -> list:
     return out
 
 
+# A database returning fewer than this is not a database worth pruning
+# against. Prune deletes, so it refuses rather than emptying the list on a
+# half-read file.
+MIN_CREDIBLE_SKILLS = 200
+
+
+def prune(hint: str = '') -> dict:
+    """Drop entries for skills the game does not have.
+
+    The shipped list came from a scrape and carries names the game never uses -
+    1,089 of 1,610 when this was written. They are not free: the matcher scores
+    an OCR'd name against every candidate, so a name the game cannot show can
+    still win a frame. `'Speed Star'` resolved to `'α-star*'` that way.
+
+    Kept by `merge_key`, not by exact name, so an un-suffixed alias of a graded
+    skill survives - `Corner Acceleration` is what OCR produces for the game's
+    `Corner Acceleration ○`, and dropping it would lose a spelling that occurs.
+    """
+    from uma_it.parse import reset_skills_database_cache
+
+    mdb = resolve(hint)
+    if not mdb:
+        return {'ret': 1, 'msg': 'master.mdb not found'}
+    try:
+        game = read_game_skills(mdb)
+    except Exception as e:
+        return {'ret': 1, 'msg': f'could not read the database: {e}'}
+    if len(game) < MIN_CREDIBLE_SKILLS:
+        log.warning(f"Refusing to prune against {len(game)} skills from {mdb}")
+        return {'ret': 1,
+                'msg': f'the database returned only {len(game)} skills; not pruning'}
+
+    keys = {merge_key(s['name']) for s in game}
+    keys.discard('')
+    existing = load_all()
+    kept = [s for s in existing if merge_key(s.get('name', '')) in keys]
+    removed = [s.get('name', '') for s in existing
+               if merge_key(s.get('name', '')) not in keys]
+
+    if removed:
+        save_all(kept)
+        reset_skills_database_cache()
+    remember_source(mdb)
+    log.info(f"Skill list pruned against {mdb}: {len(removed)} removed, "
+             f"{len(kept)} kept")
+    return {'ret': 0, 'source': mdb, 'removed': removed,
+            'removed_count': len(removed), 'total': len(kept)}
+
+
 def sync(hint: str = '') -> dict:
     """Add skills the game knows and the list does not.
 

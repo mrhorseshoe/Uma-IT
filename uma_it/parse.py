@@ -676,21 +676,28 @@ def get_canonical_skill_name(skill_name: str) -> str:
         if not query or not normalized_key:
             continue
         if query in normalized_key or normalized_key in query:
-            best_key = original_key
-            best_score = 1.0
-            best_len_ratio = min(qlen, normalized_length) / max(qlen, normalized_length) if max(qlen, normalized_length) else 1.0
-            break
-        token_inter = len(qtokens & normalized_tokens)
-        token_union = len(qtokens | normalized_tokens) or 1
-        token_score = token_inter / token_union
-        bigram_score = jaccard_counter_ratio(qbigrams, normalized_bigrams)
-        if normalized_length == qlen:
-            positional = sum(1 for i in range(qlen) if query[i] == normalized_key[i]) / qlen if qlen else 0.0
-            score = max(bigram_score, token_score, positional)
-            len_ratio = 1.0
+            # Containment is a perfect score but NOT a reason to stop looking.
+            # This used to `break` on the first hit, so a short name that is a
+            # substring of the query won outright - and which one reached the
+            # loop first depended on set iteration order. 'Acceleration' beat
+            # 'Straightaway Acceleration' on its own exact text that way.
+            # Falling through to the comparison below lets the length ratio
+            # pick the closest of several containing candidates.
+            score = 1.0
+            len_ratio = (min(qlen, normalized_length) / max(qlen, normalized_length)
+                         if max(qlen, normalized_length) else 1.0)
         else:
-            score = max(bigram_score, token_score)
-            len_ratio = min(qlen, normalized_length) / max(qlen, normalized_length)
+            token_inter = len(qtokens & normalized_tokens)
+            token_union = len(qtokens | normalized_tokens) or 1
+            token_score = token_inter / token_union
+            bigram_score = jaccard_counter_ratio(qbigrams, normalized_bigrams)
+            if normalized_length == qlen:
+                positional = sum(1 for i in range(qlen) if query[i] == normalized_key[i]) / qlen if qlen else 0.0
+                score = max(bigram_score, token_score, positional)
+                len_ratio = 1.0
+            else:
+                score = max(bigram_score, token_score)
+                len_ratio = min(qlen, normalized_length) / max(qlen, normalized_length)
         if score > best_score or (score == best_score and len_ratio > best_len_ratio):
             best_score = score
             best_len_ratio = len_ratio

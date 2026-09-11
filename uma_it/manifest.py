@@ -102,6 +102,16 @@ def sync_skills(body: Dict[str, Any] = None):
     return skills_db.sync(str((body or {}).get("path", "") or ""))
 
 
+@server.post("/api/skills/prune")
+def prune_skills(body: Dict[str, Any] = None):
+    """Drop entries for skills the game does not have.
+
+    Separate from the sync because this one deletes. It refuses outright if the
+    database reads back implausibly small, rather than emptying the list.
+    """
+    return skills_db.prune(str((body or {}).get("path", "") or ""))
+
+
 def _keep_catch_all_last():
     """Move the server's catch-all behind the routes registered here.
 
