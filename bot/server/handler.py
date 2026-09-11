@@ -122,7 +122,19 @@ def get_sys_metrics():
     return _sys_metric_cache
 
 
-SKILLS_JSON_PATH = os.path.join('resource', 'uma_it', 'skills.json')
+# The skill list is the app's, not the engine's: the user's copy in userdata/
+# shadows the one shipped in resource/, and writes always go to userdata so a
+# hand-added or synced skill never dirties a tracked file. See
+# uma_it/skills_db.py. Resolved per call because a sync can create the user's
+# copy while the server is running.
+def _skills_read_path():
+    from uma_it.skills_db import active_path
+    return active_path()
+
+
+def _skills_write_path():
+    from uma_it.skills_db import USER_PATH
+    return USER_PATH
 
 
 class AddSkillRequest(BaseModel):
@@ -137,7 +149,7 @@ class AddSkillRequest(BaseModel):
 
 @server.get("/api/skills")
 def get_skills():
-    with open(SKILLS_JSON_PATH, 'r', encoding='utf-8') as f:
+    with open(_skills_read_path(), 'r', encoding='utf-8') as f:
         return json.load(f)
 
 
@@ -146,7 +158,7 @@ def add_skill(req: AddSkillRequest):
     name = req.name.strip()
     if not name:
         return {"ret": 1, "msg": "Skill name is required"}
-    with open(SKILLS_JSON_PATH, 'r', encoding='utf-8') as f:
+    with open(_skills_read_path(), 'r', encoding='utf-8') as f:
         skills = json.load(f)
     if any(s.get('name', '').lower() == name.lower() for s in skills):
         return {"ret": 1, "msg": f"Skill '{name}' already exists"}
@@ -168,7 +180,8 @@ def add_skill(req: AddSkillRequest):
     if req.distance.strip():
         entry["distance"] = req.distance.strip()
     skills.append(entry)
-    with open(SKILLS_JSON_PATH, 'w', encoding='utf-8') as f:
+    os.makedirs(os.path.dirname(_skills_write_path()), exist_ok=True)
+    with open(_skills_write_path(), 'w', encoding='utf-8') as f:
         json.dump(skills, f, ensure_ascii=False, indent=1)
     # drop the bot's in-memory copy so OCR canonicalization sees the new
     # skill without a restart

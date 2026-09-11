@@ -574,13 +574,27 @@ def spark_rows_check(rows: list[dict], targets, mode: str = 'or', default_min_st
 skills_database_cache = None
 
 
+def reset_skills_database_cache():
+    """Forget the loaded names, so the next read picks up a synced list.
+
+    The cache is filled once per process. A sync that did not call this would
+    write a correct file and change nothing about what the running bot matches
+    against until the next restart.
+    """
+    global skills_database_cache
+    skills_database_cache = None
+
+
 def load_skills_database():
     global skills_database_cache
     if skills_database_cache is not None:
         return skills_database_cache
     try:
-        json_path = os.path.join('resource', 'uma_it', 'skills.json')
-        with open(json_path, 'r', encoding='utf-8') as f:
+        # The user's own list when they have one, else the repository's - see
+        # uma_it/skills_db.py. Imported here rather than at module scope
+        # because that module imports this one for the normaliser.
+        from uma_it.skills_db import active_path
+        with open(active_path(), 'r', encoding='utf-8') as f:
             data = json.load(f)
         names = []
         for item in data:

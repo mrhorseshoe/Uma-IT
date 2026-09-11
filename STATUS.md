@@ -17,7 +17,7 @@ skill buying and spark reroll both went end to end.
 | task settings | 16 (14 user-facing) |
 | `uma_it/` | 3,842 lines |
 | dashboard | `public/index.html`, 874 lines, one file |
-| checks | 17 scripts |
+| checks | 18 scripts |
 
 Verified live: skill buying spends a budget down to less than the cheapest
 remaining skill (4108 points to 3 in one career); spark reroll rerolls on a
@@ -284,7 +284,11 @@ py -3.10 check_scope.py
 py -3.10 check_presets.py
 ```
 
-All seventeen exit non-zero on failure. Run them after touching anything under
+```bash
+py -3.10 check_skills_db.py
+```
+
+All eighteen exit non-zero on failure. Run them after touching anything under
 `uma_it/` or `bot/`.
 
 ## Running it

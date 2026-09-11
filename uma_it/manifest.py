@@ -47,6 +47,7 @@ from uma_it.dialogs import script_dialog, script_not_found_ui
 from uma_it.screens import scan_ui_list
 from uma_it.task import APP_NAME, UmaItTaskType, build_task
 from uma_it import presets
+from uma_it import skills_db
 
 log = logger.get_logger(__name__)
 
@@ -75,6 +76,30 @@ def save_skill_preset(preset: Dict[str, Any]):
 @server.delete("/api/skill-presets")
 def delete_skill_preset(body: Dict[str, Any]):
     return {"ret": 0, "deleted": presets.delete(body.get("name", ""))}
+
+
+@server.get("/api/skills/source")
+def skills_source():
+    """Where the game database is, so the page knows whether to ask.
+
+    `found` false is not an error - it is the first press on a machine whose
+    install is somewhere unusual, and the page shows the picker.
+    """
+    found = skills_db.resolve()
+    return {"remembered": skills_db.remembered_source(),
+            "found": found,
+            "using_user_list": skills_db.active_path() == skills_db.USER_PATH}
+
+
+@server.post("/api/skills/sync")
+def sync_skills(body: Dict[str, Any] = None):
+    """Add any skills the game knows and the list does not.
+
+    `path` is whatever the user typed - the game folder, the master folder, or
+    master.mdb itself. Empty means "use the remembered one, or look in the
+    usual places".
+    """
+    return skills_db.sync(str((body or {}).get("path", "") or ""))
 
 
 def _keep_catch_all_last():

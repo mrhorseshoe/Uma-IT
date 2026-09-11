@@ -164,6 +164,25 @@ Skill configurations can be saved as named presets, stored per-file under
 Note that a reroll costs **30 TP**, the same as a career. Targeting a 3★ spark
 rerolls on roughly 99% of careers, which doubles the TP a loop consumes.
 
+### Keeping the skill list current
+
+The bot OCRs a skill name off the screen and fuzzy-matches it against a list of
+known names, so a skill it has never heard of cannot be bought and nothing says
+why. After a game update adds skills — a new umamusume, a new support card —
+press **Update from game files** in the skill section.
+
+It reads the game's own `master.mdb`, which is the authority on these names, and
+adds anything the list is missing. It never removes anything. The first press
+looks in the usual place; if your install is somewhere else it asks for the
+folder, and remembers it afterwards. You can give it the game folder, the folder
+holding `master.mdb`, or the file itself.
+
+**Your list is yours.** The repository ships a baseline at
+`resource/uma_it/skills.json` and never receives updates; a sync writes to
+`userdata/skills.json`, which is gitignored and shadows the shipped one. Keeping
+it current after a game update is up to you. Delete that file to fall back to
+the baseline.
+
 ## What changed from UAT-Global-Server
 
 This is a fresh, much smaller project rather than a fork of
@@ -214,7 +233,7 @@ including normal-career play.
 
 ## Development
 
-There is no test framework. Instead there are 17 `check_*.py` scripts at the
+There is no test framework. Instead there are 18 `check_*.py` scripts at the
 repo root, each driving real functions with fakes and asserting on the clicks and
 decisions they produce:
 
