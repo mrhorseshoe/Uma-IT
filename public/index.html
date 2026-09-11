@@ -487,16 +487,33 @@ async function refresh() {
   }
 }
 
+/* True when the task has run every career it was asked for.
+   The scheduler stays "running" after the last one - it only means its thread
+   is alive, and it will not restart a task that has reached its limit - so
+   "running" and "finished" look identical from the status endpoint alone. */
+function isFinished(d) {
+  if (!task || !d) return false;
+  const limit = d.loop_count || 0;
+  return limit > 0 && (d.loops_done || 0) >= limit &&
+         task.task_status === 4;           // SUCCESS
+}
+
 function render(status, state) {
   const it = (state && state.independent_training) || {};
   const running = status.status === "running" || status.status === "finishing";
+  const d = task && task.detail;
+  const finished = isFinished(d);
 
-  $("state").textContent = running
-    ? (it.active ? "Training" : "Running")
+  $("state").textContent = finished
+    ? "Done"
+    : running ? (it.active ? "Training" : "Running")
     : status.status === "stopped" ? "Stopped" : status.status;
 
   const tag = $("tag");
-  if (status.stop_after_run) {
+  if (finished) {
+    tag.hidden = false;
+    tag.textContent = `${d.loops_done} of ${d.loop_count} careers`;
+  } else if (status.stop_after_run) {
     tag.hidden = false;
     tag.textContent = "stopping after this run";
   } else if (task && task.task_status && STATUS[task.task_status] && !running) {
@@ -507,12 +524,20 @@ function render(status, state) {
   }
 
   $("remaining").textContent = it.remaining || "—";
-  const d = task && task.detail;
   $("runs").textContent = d ? (d.loops_done ?? 0) : "—";
   $("limit").textContent = d ? (d.loop_count ? d.loop_count : "∞") : "—";
 
-  $("start").disabled = running || !task;
-  $("finish").disabled = !running || status.stop_after_run;
+  // Start does nothing once the limit is reached: the scheduler leaves a task
+  // at SUCCESS and never restarts it, and reset-task only sets PENDING, which
+  // it flips straight back. Running again means clearing the count.
+  $("start").textContent = finished ? "Run again" : "Start";
+  $("start").onclick = finished ? runAgain
+                                : () => act("/action/bot/start", "Started");
+  // Not `running || !task`: the scheduler reports "running" after the last
+  // career too, so that disabled Run again exactly when it is wanted.
+  $("start").disabled = !task || (running && !finished);
+  // Meaningless once the loop is done - there is no run to stop after.
+  $("finish").disabled = !running || status.stop_after_run || finished;
   $("stop").disabled = !running;
 
   if (!editing) renderTask();
@@ -594,6 +619,51 @@ function closeForm() {
   renderTask();
 }
 
+/* Replace the saved task with this payload. The API has no update, so a
+   change is a delete followed by an add. */
+async function writeTask(payload) {
+  if (task) {
+    await api("/task", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task_id: task.task_id }),
+    });
+  }
+  const res = await api("/task", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      app_name: "uma-it",
+      task_execute_mode: 3,
+      task_type: 1,
+      task_desc: "Training",
+      attachment_data: payload,
+    }),
+  });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+}
+
+/* Start the same task over. Clearing loops_done is the whole trick: the
+   scheduler leaves a task at SUCCESS once the count reaches the limit, and
+   reset-task only sets PENDING, which it flips straight back to SUCCESS on the
+   next tick. */
+async function runAgain() {
+  if (!task) return;
+  $("start").disabled = true;
+  try {
+    await writeTask(Object.assign({}, task.detail, { loops_done: 0 }));
+    await refresh();
+    const res = await api("/action/bot/start", { method: "POST" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    note(`Running ${task.detail.loop_count} more career(s)`);
+    await refresh();
+  } catch (e) {
+    note("Could not run again: " + e.message, true);
+  } finally {
+    $("start").disabled = false;
+  }
+}
+
 async function saveTask(ev) {
   ev.preventDefault();
   const payload = {
@@ -617,25 +687,7 @@ async function saveTask(ev) {
   };
   $("save").disabled = true;
   try {
-    if (task) {
-      await api("/task", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task_id: task.task_id }),
-      });
-    }
-    const res = await api("/task", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        app_name: "uma-it",
-        task_execute_mode: 3,
-        task_type: 1,
-        task_desc: "Training",
-        attachment_data: payload,
-      }),
-    });
-    if (!res.ok) throw new Error("HTTP " + res.status);
+    await writeTask(payload);
     note("Task saved");
     closeForm();
     await refresh();
@@ -673,7 +725,7 @@ async function loadLog(taskId) {
   }
 }
 
-$("start").onclick = () => act("/action/bot/start", "Started");
+// $("start") is bound in render(), which swaps it between Start and Run again.
 $("stop").onclick = () => act("/action/bot/stop", "Stopping");
 $("finish").onclick = () => act("/action/bot/stop-after-run", "Will stop after this run");
 for (const id of ["tier0", "tier1", "tier2", "blacklist"]) tagBoxes[id] = new TagBox(id);
