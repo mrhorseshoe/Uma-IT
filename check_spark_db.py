@@ -88,6 +88,88 @@ check("  while the real pink row still hits", hit == 'Long', repr(hit))
 hit = spark_rows_check([row('green', 'Speed', 3)], {'Speed': 2}, 'or', 3)
 check("  and a green row is ignored too", hit == '', repr(hit))
 
+print("\nwhite requirement rows: every row, any entry within a row")
+from uma_it.parse import spark_skill_rows_check, spark_rule_check
+from uma_it.task import _skill_requirement_rows
+
+
+def white(name, stars):
+    return {'name': name, 'canonical': name, 'stars': stars,
+            'color': 'white', 'y': 0}
+
+
+HAVE = [white('URA Finale', 2), white('Corner Recovery ○', 1),
+        white('Arima Kinen', 3)]
+
+check("one row, one entry that is present",
+      bool(spark_skill_rows_check(HAVE, [[{'name': 'URA Finale', 'stars': 2}]])))
+check("  not present -> no match",
+      spark_skill_rows_check(HAVE, [[{'name': 'Lay Low', 'stars': 1}]]) == '')
+check("  present but short of the stars -> no match",
+      spark_skill_rows_check(HAVE, [[{'name': 'URA Finale', 'stars': 3}]]) == '')
+check("  more stars than asked for still matches",
+      bool(spark_skill_rows_check(HAVE, [[{'name': 'Arima Kinen', 'stars': 1}]])))
+
+# One entry per row is a pure AND; one row holding everything is a pure OR.
+# Both fall out of the structure, which is the reason for choosing it.
+AND_RULE = [[{'name': 'URA Finale', 'stars': 2}],
+            [{'name': 'Arima Kinen', 'stars': 3}]]
+check("a row each is a pure AND, and both are here",
+      bool(spark_skill_rows_check(HAVE, AND_RULE)))
+check("  and it fails when only one is",
+      spark_skill_rows_check([white('URA Finale', 2)], AND_RULE) == '')
+
+OR_RULE = [[{'name': 'Lay Low', 'stars': 1}, {'name': 'URA Finale', 'stars': 2}]]
+check("one row is a pure OR, satisfied by the second entry",
+      bool(spark_skill_rows_check(HAVE, OR_RULE)))
+check("  and fails only when no entry is present",
+      spark_skill_rows_check([white('Arima Kinen', 3)], OR_RULE) == '')
+
+check("the grade symbol is not a difference",
+      bool(spark_skill_rows_check(HAVE, [[{'name': 'Corner Recovery', 'stars': 1}]])),
+      "stored target without ○ must match a row read with it")
+check("no requirements is not a match on its own",
+      spark_skill_rows_check(HAVE, []) == '')
+check("a blue row cannot satisfy a white requirement",
+      spark_skill_rows_check(
+          [{'name': 'Speed', 'canonical': 'Speed', 'stars': 3,
+            'color': 'blue', 'y': 0}],
+          [[{'name': 'Speed', 'stars': 1}]]) == '')
+
+print("\nthe whole rule: colour targets AND white rows")
+BLUE = {'name': 'Speed', 'canonical': 'Speed', 'stars': 3, 'color': 'blue', 'y': 0}
+rows = HAVE + [BLUE]
+check("colour alone still works when no white rows are set",
+      bool(spark_rule_check(rows, {'speed': 2}, 'or', 3, [])))
+check("white alone works when no colour targets are set",
+      bool(spark_rule_check(rows, {}, 'or', 3, [[{'name': 'URA Finale', 'stars': 2}]])))
+check("  which is the parent-farming case, and it ignores the colours",
+      bool(spark_rule_check([white('URA Finale', 2)], {}, 'or', 3,
+                            [[{'name': 'URA Finale', 'stars': 2}]])))
+check("both set means both must hold",
+      bool(spark_rule_check(rows, {'speed': 2}, 'or', 3,
+                            [[{'name': 'URA Finale', 'stars': 2}]])))
+check("  colour hit but white missing -> no match",
+      spark_rule_check(rows, {'speed': 2}, 'or', 3,
+                       [[{'name': 'Lay Low', 'stars': 1}]]) == '')
+check("  white hit but colour missing -> no match",
+      spark_rule_check(rows, {'guts': 3}, 'or', 3,
+                       [[{'name': 'URA Finale', 'stars': 2}]]) == '')
+check("nothing targeted at all is never a match",
+      spark_rule_check(rows, {}, 'or', 3, []) == '')
+
+print("\nrequirement rows survive a payload")
+check("a saved rule round-trips",
+      _skill_requirement_rows([[{'name': 'URA Finale', 'stars': 2}]])
+      == [[{'name': 'URA Finale', 'stars': 2}]])
+check("  a bare name becomes a one-entry row at one star",
+      _skill_requirement_rows(['URA Finale']) == [[{'name': 'URA Finale', 'stars': 1}]])
+check("  stars are clamped to 1-3",
+      _skill_requirement_rows([[{'name': 'X', 'stars': 9}]])[0][0]['stars'] == 3)
+for junk in (None, 'nonsense', 42, [[]], [[{'name': ''}]], [{'nope': 1}]):
+    check(f"  {junk!r} yields no requirement", _skill_requirement_rows(junk) == [],
+          str(_skill_requirement_rows(junk)))
+
 print("\nthe version note covers the vocabulary too")
 from uma_it import skills_db
 _meta = {}

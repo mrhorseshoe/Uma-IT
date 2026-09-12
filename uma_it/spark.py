@@ -46,7 +46,7 @@ from uma_it.parse import (
     parse_factor,
     parse_spark_rows,
     parse_spark_selection_title,
-    spark_rows_check,
+    spark_rule_check,
     spark_scrollbar_ratio,
 )
 from uma_it import tp
@@ -64,9 +64,16 @@ FULLY_VISIBLE = 0.999
 
 
 def _spark_reroll_active(ctx) -> bool:
+    """Rerolling needs the switch and something to look for.
+
+    Either kind of target counts. White requirements on their own are the
+    whole point of the feature for parent farming, where the stats and
+    aptitudes do not matter and `spark_reroll_targets` is left empty.
+    """
     detail = ctx.task.detail
     return bool(getattr(detail, 'spark_reroll_enabled', False)) \
-        and bool(getattr(detail, 'spark_reroll_targets', []))
+        and bool(getattr(detail, 'spark_reroll_targets', None)
+                 or getattr(detail, 'spark_skill_targets', None))
 
 def _spark_rows_text(rows) -> str:
     return ", ".join(f"{r['color'] or '?'}:{r['name'] or '?'}({r['canonical'] or '-'}) {r['stars']}*"
@@ -155,7 +162,8 @@ def script_factor_reroll(ctx):
         targets = detail.spark_reroll_targets
         min_stars = getattr(detail, 'spark_reroll_min_stars', 3)
         mode = getattr(detail, 'spark_reroll_mode', 'or')
-        hit = spark_rows_check(rows, targets, mode, min_stars)
+        wanted_skills = getattr(detail, 'spark_skill_targets', []) or []
+        hit = spark_rule_check(rows, targets, mode, min_stars, wanted_skills)
         if hit:
             log.info(f"🎲 Desired spark(s) '{hit}' present at the required stars - keeping this roll")
             d.spark_reroll_phase = 'keep'
@@ -227,7 +235,8 @@ def handle_spark_selection(ctx):
 
         rerolled_rows = parse_spark_rows(ctx)
         log.info(f"🎲 Rerolled sparks: {_spark_rows_text(rerolled_rows)}")
-        hit = spark_rows_check(rerolled_rows, targets, mode, min_stars)
+        wanted_skills = getattr(detail, 'spark_skill_targets', []) or []
+        hit = spark_rule_check(rerolled_rows, targets, mode, min_stars, wanted_skills)
         if hit:
             choose_rerolled = True
             reason = f"rerolled set has {hit}"

@@ -89,6 +89,22 @@ class TaskDetail:
     spark_reroll_mode: str
     spark_reroll_min_stars: int
     stop_at_spark_reroll: bool
+    # White sparks - skills, races, scenarios - as requirement rows. Every row
+    # must be satisfied, and any one entry satisfies its row:
+    #
+    #   [[{'name': 'URA Finale', 'stars': 2}],
+    #    [{'name': 'Corner Recovery', 'stars': 2},
+    #     {'name': 'Swinging Maestro', 'stars': 1}]]
+    #
+    # reads "URA Finale, and either Corner Recovery or Swinging Maestro".
+    #
+    # Rows rather than a chain of AND/OR operators because the structure *is*
+    # the precedence - there is nothing to disambiguate, and both degenerate
+    # cases fall out: one entry per row is a pure AND, one row holding
+    # everything is a pure OR. Measured on 140 captured rolls, a specific pair
+    # of skills co-occurs in about 2-4% of them while "any of five" lands near
+    # 56%, so the arrangement people need most often is the cheap one here.
+    spark_skill_targets: list
     # No `spark_reroll_use_carats`. In the parent that flag authorises a
     # 66-line flow that drives the in-game shop to buy TP with carats, and it
     # is not ported: carats are real currency, `allow_recover_tp` already
@@ -164,6 +180,40 @@ class UmaItTask(Task):
         super().start_task()
 
 
+def _skill_requirement_rows(value):
+    """Coerce the white-spark requirement rows into their one valid shape.
+
+    Read defensively because this arrives from a dashboard payload and from
+    tasks saved before the field existed. Anything unrecognisable becomes an
+    empty list, which means "no white requirement" - the safe reading, since a
+    malformed rule that silently matched everything would keep bad rolls.
+    """
+    rows = []
+    if not isinstance(value, list):
+        return rows
+    for row in value:
+        # A bare string or dict is a row of one; people and older payloads
+        # both write it that way.
+        if isinstance(row, (str, dict)):
+            row = [row]
+        if not isinstance(row, list):
+            continue
+        entries = []
+        for entry in row:
+            if isinstance(entry, str):
+                entry = {'name': entry}
+            if not isinstance(entry, dict):
+                continue
+            name = str(entry.get('name') or '').strip()
+            if not name:
+                continue
+            entries.append({'name': name,
+                            'stars': _int(entry.get('stars'), 1, 1, 3)})
+        if entries:
+            rows.append(entries)
+    return rows
+
+
 def _int(value, default, low=None, high=None):
     """int(value) with a default, because payloads arrive from JSON and users."""
     try:
@@ -219,6 +269,7 @@ def build_task(task_execute_mode: TaskExecuteMode, task_type: int,
         td.spark_reroll_targets = {}
     td.spark_reroll_mode = 'and' if data.get('spark_reroll_mode') == 'and' else 'or'
     td.stop_at_spark_reroll = bool(data.get('stop_at_spark_reroll', False))
+    td.spark_skill_targets = _skill_requirement_rows(data.get('spark_skill_targets'))
 
     task = UmaItTask(app_name=APP_NAME,
                      task_execute_mode=task_execute_mode,

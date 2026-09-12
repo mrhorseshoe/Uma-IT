@@ -581,6 +581,72 @@ def spark_rows_check(rows: list[dict], targets, mode: str = 'or', default_min_st
     return blue_hit or pink_hit
 
 
+def spark_skill_rows_check(rows, requirements) -> str:
+    """Check white sparks against requirement rows, ANDed, OR within a row.
+
+    `requirements` is [[{'name', 'stars'}, ...], ...]. Every row must be
+    satisfied; any one entry satisfies its row. No requirements means no
+    constraint, and the caller decides what that implies.
+
+    Names are compared through `merge_key`, the same normalisation that built
+    the vocabulary, so a stored target and a row read off the screen agree on
+    the game's grade symbols.
+    """
+    if not requirements:
+        return ''
+    from uma_it.skills_db import merge_key
+    present = {}
+    for row in rows:
+        if row.get('color') != 'white':
+            continue
+        name = row.get('canonical') or ''
+        if not name:
+            continue
+        key = merge_key(name)
+        stars = row.get('stars', 0) or 0
+        if stars >= present.get(key, (0, ''))[0]:
+            present[key] = (stars, name)
+
+    satisfied = []
+    for entries in requirements:
+        hit = ''
+        for entry in entries:
+            key = merge_key(entry.get('name', ''))
+            need = entry.get('stars', 1) or 1
+            got = present.get(key)
+            if got and got[0] >= need:
+                hit = f"{got[1]} {got[0]}*"
+                break
+        if not hit:
+            return ''
+        satisfied.append(hit)
+    return ', '.join(satisfied)
+
+
+def spark_rule_check(rows, targets, mode, default_min_stars, requirements) -> str:
+    """The whole keep-or-reroll rule: colour targets AND white requirements.
+
+    White rows are ANDed onto the blue/pink result rather than joining their
+    Either/Both control. Two levels of operator on one screen is where this
+    gets genuinely confusing, and for the case it was built for - parent
+    farming, where the stats and aptitudes do not matter - blue and pink are
+    simply left empty and that half is vacuously true.
+    """
+    colour_desc = ''
+    if targets:
+        colour_desc = spark_rows_check(rows, targets, mode, default_min_stars)
+        if not colour_desc:
+            return ''
+    skill_desc = ''
+    if requirements:
+        skill_desc = spark_skill_rows_check(rows, requirements)
+        if not skill_desc:
+            return ''
+    if not targets and not requirements:
+        return ''
+    return ' + '.join(p for p in (colour_desc, skill_desc) if p)
+
+
 # --- skill buying ---------------------------------------------------------
 # Reading the skill list off the learn-skills screen: names, costs, hint
 # levels, and whether each is still purchasable. Moved from the parent

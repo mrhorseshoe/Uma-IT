@@ -159,6 +159,21 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .spark .st { color: var(--accent); font-size: 11px; }
 .sparks .sep { flex-basis: 100%; height: 0; }
 
+/* A white-spark requirement: a bordered row of alternatives. The border is
+   what carries the meaning - inside it is "or", between boxes is "and" - so it
+   has to read as a container rather than a list item. */
+.reqrow {
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+  margin-bottom: 6px; background: var(--bg);
+}
+.reqrow .chips { margin-bottom: 4px; }
+.reqrow input { width: 100%; font-size: 13px; }
+.reqrow .orline { font-size: 11px; color: var(--muted); margin-bottom: 4px;
+                  text-transform: uppercase; letter-spacing: 0.06em; }
+.reqjoin { font-size: 11px; color: var(--muted); text-transform: uppercase;
+           letter-spacing: 0.08em; margin: 0 0 6px 2px; }
+.chip .st { color: var(--accent); font-size: 11px; cursor: pointer; }
+
 .seg { display: flex; gap: 0; }
 .seg button {
   border-radius: 0; font-size: 12px; padding: 6px 12px; color: var(--muted);
@@ -342,6 +357,27 @@ pre#log {
           <button type="button" id="mode-and" data-mode="and">Both groups</button>
         </div>
       </div>
+
+      <!-- White sparks: skills, races and scenarios. Requirement rows rather
+           than a chain of operators - every row must hold, any one entry holds
+           its row - so the structure is the precedence and there is nothing to
+           disambiguate. One entry per row is a pure AND; one row holding
+           everything is a pure OR. -->
+      <div class="field">
+        <label>Skill sparks
+          <span class="hint">Needs every row. Any one entry satisfies its row</span>
+        </label>
+      </div>
+      <div id="skill-reqs"></div>
+      <div class="presetbox">
+        <button type="button" id="req-add">+ Add requirement</button>
+      </div>
+      <div class="field">
+        <label>Keeps a roll with
+          <span class="hint" id="rule-readback">nothing targeted yet</span>
+        </label>
+      </div>
+      <datalist id="spark-names"></datalist>
       <div class="field">
         <label for="stopreroll">Stop at the reroll screen
           <span class="hint">Ends a single-run task there so you can reroll by hand</span>
@@ -568,6 +604,121 @@ async function pruneSkills() {
   }
 }
 
+/* White spark requirements.
+
+   State is [[{name, stars}, ...], ...]: the outer list is ANDed, each inner
+   list is ORed. The border in the markup is the only thing that says so, which
+   is why the readback under it spells the rule out in words - a rule that
+   reads wrong should be visible before it costs a 30 TP reroll. */
+let SPARK_NAMES = new Set();
+let skillReqs = [];
+
+async function loadSparkNames() {
+  try {
+    const data = await api("/api/sparks").then((r) => r.json());
+    const names = (Array.isArray(data) ? data : []).map((s) => s && s.name).filter(Boolean);
+    SPARK_NAMES = new Set(names);
+    $("spark-names").replaceChildren(...names.map((n) => {
+      const o = document.createElement("option");
+      o.value = n;
+      return o;
+    }));
+  } catch (e) {
+    // The picker still accepts a typed name; only autocomplete is lost.
+  }
+}
+
+function renderReqs() {
+  const host = $("skill-reqs");
+  host.replaceChildren();
+  skillReqs.forEach((entries, ri) => {
+    if (ri) {
+      const join = document.createElement("div");
+      join.className = "reqjoin";
+      join.textContent = "and";
+      host.append(join);
+    }
+    const box = document.createElement("div");
+    box.className = "reqrow";
+    const chips = document.createElement("div");
+    chips.className = "chips";
+    entries.forEach((entry, ei) => {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.append(entry.name + " ");
+      // Stars cycle 1 -> 2 -> 3 -> 1, the same gesture as the blue/pink chips.
+      const st = document.createElement("span");
+      st.className = "st";
+      st.textContent = "★".repeat(entry.stars) + "☆".repeat(3 - entry.stars);
+      st.title = "Click to change the stars needed";
+      st.onclick = () => { entry.stars = (entry.stars % 3) + 1; renderReqs(); };
+      chip.append(st);
+      const x = document.createElement("button");
+      x.type = "button";
+      x.textContent = "×";
+      x.onclick = () => {
+        entries.splice(ei, 1);
+        if (!entries.length) skillReqs.splice(ri, 1);
+        renderReqs();
+      };
+      chip.append(x);
+      chips.append(chip);
+    });
+    box.append(chips);
+    const input = document.createElement("input");
+    input.type = "text";
+    input.setAttribute("list", "spark-names");
+    input.placeholder = entries.length ? "or…" : "Add a spark…";
+    const take = () => {
+      const name = input.value.trim();
+      if (name && !entries.some((e) => e.name === name)) {
+        entries.push({ name: name, stars: 1 });
+      }
+      input.value = "";
+      renderReqs();
+    };
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); take(); }
+    });
+    input.addEventListener("input", () => { if (SPARK_NAMES.has(input.value)) take(); });
+    box.append(input);
+    host.append(box);
+  });
+  showReadback();
+}
+
+function setReqs(rows) {
+  skillReqs = (Array.isArray(rows) ? rows : []).map((row) =>
+    (Array.isArray(row) ? row : []).map((e) => ({
+      name: String((e && e.name) || e || ""),
+      stars: Math.min(3, Math.max(1, parseInt((e && e.stars) || 1, 10) || 1)),
+    })).filter((e) => e.name)).filter((row) => row.length);
+  renderReqs();
+}
+
+function getReqs() {
+  return skillReqs.filter((r) => r.length).map((r) => r.map((e) => ({ name: e.name, stars: e.stars })));
+}
+
+/* The rule in words. Without this the only statement of what was configured is
+   a set of boxes, and "needs every row" is exactly the kind of thing people
+   read the other way round. */
+function showReadback() {
+  const parts = [];
+  const colour = sparkTargets || {};
+  if (Object.keys(colour).length) {
+    const names = Object.keys(colour).map((n) => `${n} ${colour[n]}★`);
+    const joiner = sparkMode === "and" ? " and " : " or ";
+    parts.push(names.join(joiner));
+  }
+  getReqs().forEach((row) => {
+    parts.push(row.map((e) => `${e.name} ${e.stars}★`).join(" or "));
+  });
+  $("rule-readback").textContent = parts.length
+    ? parts.join(", and ")
+    : "nothing targeted yet";
+}
+
 let presetList = [];
 
 async function loadPresets(select) {
@@ -682,6 +833,7 @@ function renderSparks() {
       b.append(s);
     }
   }
+  showReadback();
   $("mode-or").classList.toggle("on", sparkMode === "or");
   $("mode-and").classList.toggle("on", sparkMode === "and");
 }
@@ -823,6 +975,7 @@ function openForm() {
   $("onlymine").checked = !!d.learn_skill_only_user_provided;
 
   sparkTargets = Object.assign({}, d.spark_reroll_targets || {});
+  setReqs(d.spark_skill_targets || []);
   sparkMode = d.spark_reroll_mode === "and" ? "and" : "or";
   $("reroll").checked = !!d.spark_reroll_enabled;
   $("stopreroll").checked = !!d.stop_at_spark_reroll;
@@ -910,6 +1063,7 @@ async function saveTask(ev) {
     learn_skill_only_user_provided: $("onlymine").checked,
     spark_reroll_enabled: $("reroll").checked,
     spark_reroll_targets: sparkTargets,
+    spark_skill_targets: getReqs(),
     spark_reroll_mode: sparkMode,
     stop_at_spark_reroll: $("stopreroll").checked,
     // The engine reads this as a level, not a flag: 0 never spends, higher
@@ -969,9 +1123,12 @@ $("data-sync").onclick = () => updateGameData("");
 $("data-go").onclick = () => updateGameData($("data-path").value.trim());
 $("data-prune").onclick = pruneSkills;
 showDataVersion();
+loadSparkNames();
+renderReqs();
 loadPresets();
 $("skills").onchange = syncBlocks;
 $("reroll").onchange = syncBlocks;
+$("req-add").onclick = () => { skillReqs.push([]); renderReqs(); };
 $("mode-or").onclick = () => { sparkMode = "or"; renderSparks(); };
 $("mode-and").onclick = () => { sparkMode = "and"; renderSparks(); };
 

@@ -154,6 +154,7 @@ Everything is set from the dashboard. The task carries 14 user-facing settings:
 | `learn_skill_only_user_provided` | buy only what is listed, ignoring leftovers |
 | `spark_reroll_enabled` | turn spark reroll on |
 | `spark_reroll_targets` | spark name to minimum stars |
+| `spark_skill_targets` | white spark requirement rows: every row must hold, any entry satisfies its row |
 | `spark_reroll_mode` | `or` needs a hit in either group, `and` in both |
 | `spark_reroll_min_stars` | default minimum for targets that do not set their own |
 | `stop_at_spark_reroll` | stop on the sparks screen so you can reroll by hand |

@@ -160,6 +160,23 @@ check("  and one short of the limit keeps running", scheduler.active is True,
       str(scheduler.active))
 scheduler.active = False
 
+# White spark requirements are nested lists of dicts, the most structured thing
+# a task carries. The process soft-restarts after every career, so a rule that
+# did not survive the engine's serializer would quietly become "no requirement"
+# - which matches nothing, rerolls every career, and says nothing about why.
+print("\nwhite spark requirements survive the restart")
+RULE = [[{'name': 'URA Finale', 'stars': 2}],
+        [{'name': 'Corner Recovery ○', 'stars': 2}, {'name': 'Lay Low', 'stars': 1}]]
+t7 = build_task(LOOP, 1, "sparks", None, dict(REAL, spark_skill_targets=RULE))
+check("the rule is read off the payload", t7.detail.spark_skill_targets == RULE,
+      str(t7.detail.spark_skill_targets))
+t8 = build_task(LOOP, 1, "sparks", None, serialize_umamusume_task(t7) or {})
+check("  and comes back identical through the real serializer",
+      t8.detail.spark_skill_targets == RULE, str(t8.detail.spark_skill_targets))
+t9 = build_task(LOOP, 1, "sparks", None, REAL)
+check("a task saved before the field existed restores with no requirement",
+      t9.detail.spark_skill_targets == [], str(t9.detail.spark_skill_targets))
+
 # The scheduler reads these two off the detail by name to decide when a loop is
 # done. A rename here would silently make every loop unlimited.
 print("\nfields the scheduler reads by name")

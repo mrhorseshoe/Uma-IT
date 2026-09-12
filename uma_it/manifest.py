@@ -48,6 +48,7 @@ from uma_it.screens import scan_ui_list
 from uma_it.task import APP_NAME, UmaItTaskType, build_task
 from uma_it import presets
 from uma_it import skills_db
+from uma_it import spark_db
 
 log = logger.get_logger(__name__)
 
@@ -76,6 +77,19 @@ def save_skill_preset(preset: Dict[str, Any]):
 @server.delete("/api/skill-presets")
 def delete_skill_preset(body: Dict[str, Any]):
     return {"ret": 0, "deleted": presets.delete(body.get("name", ""))}
+
+
+@server.get("/api/sparks")
+def list_sparks():
+    """The spark vocabulary the dashboard offers as reroll targets.
+
+    White only - blue and pink already have their own chips, and a green spark
+    is a unique skill nobody can choose to inherit. Kind is returned so the
+    picker can group skills, races and scenarios rather than showing one flat
+    list of 273 names.
+    """
+    return [s for s in spark_db.load_all()
+            if s.get('kind') in spark_db.WHITE_KINDS]
 
 
 @server.get("/api/skills/source")
