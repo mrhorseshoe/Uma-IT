@@ -206,6 +206,26 @@ pre#log {
   <div id="note"></div>
 </section>
 
+<!-- Top level, not inside the skill section, because both lists go stale for
+     the same reason and the skill section is hidden when skill buying is off -
+     which left someone using only spark reroll with no way to reach this. -->
+<section class="card">
+  <h2>Game data</h2>
+  <div class="row">
+    <span class="hint grow" id="data-version">—</span>
+    <button id="data-sync">Update data</button>
+    <button class="quiet danger" id="data-prune">Remove unknown skills</button>
+  </div>
+  <!-- Shown only when the game database is not where it usually is. A browser
+       cannot hand the server a folder path, so this is typed. -->
+  <div class="row" id="data-pick" hidden style="margin-top:10px">
+    <input type="text" class="grow" id="data-path"
+           placeholder="Path to the game folder, or to master.mdb">
+    <button id="data-go">Use this folder</button>
+  </div>
+  <div id="data-note"></div>
+</section>
+
 <section class="card">
   <h2>Task</h2>
   <div id="task-view">
@@ -272,29 +292,6 @@ pre#log {
         <div class="presetbox">
           <input type="text" id="preset-name" placeholder="Preset name">
           <button type="button" id="preset-save">Save</button>
-        </div>
-      </div>
-
-      <div class="field">
-        <label>Skill list
-          <span class="hint">Names the bot can recognise. Top it up after a game update</span>
-        </label>
-        <div class="presetbox">
-          <button type="button" id="skills-sync">Update from game files</button>
-          <button type="button" class="quiet danger" id="skills-prune">Remove unknown</button>
-        </div>
-        <div class="presetbox">
-          <span class="hint" id="skills-version"></span>
-        </div>
-        <div class="presetbox">
-          <span class="hint" id="skills-sync-note"></span>
-        </div>
-        <!-- Shown only when the game database is not where it usually is. A
-             browser cannot hand the server a folder path, so this is typed. -->
-        <div class="presetbox" id="skills-sync-pick" hidden>
-          <input type="text" id="skills-sync-path"
-                 placeholder="Path to the game folder, or to master.mdb">
-          <button type="button" id="skills-sync-go">Use this folder</button>
         </div>
       </div>
 
@@ -480,14 +477,14 @@ async function loadSkillNames() {
 /* Which game version the list is current to. Shown next to the buttons so it
    is obvious when the list has fallen behind an update - the failure it
    prevents is silent, a skill that simply never gets bought. */
-async function showSkillsVersion(meta) {
-  const el = $("skills-version");
+async function showDataVersion(meta) {
+  const el = $("data-version");
   try {
     if (!meta) {
       const src = await api("/api/skills/source").then((r) => r.json());
       meta = src.meta;
     }
-    if (!meta || !meta.skills) { el.textContent = ""; return; }
+    if (!meta || !meta.skills) { el.textContent = "No game data read yet"; return; }
     const ver = meta.game_version ? `game ${meta.game_version}` : "unknown game version";
     const when = meta.master_mdb_date ? `, data ${meta.master_mdb_date}` : "";
     const sp = meta.sparks ? ` and ${meta.sparks} sparks` : "";
@@ -497,9 +494,12 @@ async function showSkillsVersion(meta) {
   }
 }
 
-async function syncSkills(path) {
-  const note = $("skills-sync-note");
-  const btn = $("skills-sync");
+/* One press, both lists. Skills and sparks come out of the same master.mdb and
+   go stale on the same game update, so splitting them into two buttons would
+   only create a state where one is current and the other is not. */
+async function updateGameData(path) {
+  const note = $("data-note");
+  const btn = $("data-sync");
   btn.disabled = true;
   note.textContent = "Reading the game database…";
   try {
@@ -511,21 +511,24 @@ async function syncSkills(path) {
 
     if (res.ret !== 0) {
       // Not an error the user caused: their install is somewhere else.
-      $("skills-sync-pick").hidden = false;
+      $("data-pick").hidden = false;
       note.textContent = "Could not find master.mdb. Pick the game folder.";
       return;
     }
-    $("skills-sync-pick").hidden = true;
-    note.textContent = res.added_count
-      ? `Added ${res.added_count} skill${res.added_count === 1 ? "" : "s"} (${res.total} total)`
-      : `Already up to date (${res.total} skills)`;
+    $("data-pick").hidden = true;
+    const bits = [];
+    if (res.added_count) bits.push(`${res.added_count} skill${res.added_count === 1 ? "" : "s"}`);
+    if (res.sparks_added) bits.push(`${res.sparks_added} spark${res.sparks_added === 1 ? "" : "s"}`);
+    note.textContent = bits.length
+      ? `Added ${bits.join(" and ")}`
+      : "Already up to date";
     if (res.added_count) {
       note.title = res.added.join(", ");
       await loadSkillNames();
     }
-    await showSkillsVersion(res.meta);
+    await showDataVersion(res.meta);
   } catch (e) {
-    note.textContent = "Sync failed: " + e.message;
+    note.textContent = "Update failed: " + e.message;
   } finally {
     btn.disabled = false;
   }
@@ -536,11 +539,11 @@ async function syncSkills(path) {
    OCR'd name against every candidate, so a name that cannot appear can still
    win a frame. Confirmed first, because unlike the sync this one deletes. */
 async function pruneSkills() {
-  const note = $("skills-sync-note");
+  const note = $("data-note");
   if (!confirm("Remove every skill the game's own database does not have?\n\n"
                + "Your priorities and blacklist are not touched, and you can "
-               + "rebuild the list with Update from game files.")) return;
-  const btn = $("skills-prune");
+               + "rebuild the list with Update data.")) return;
+  const btn = $("data-prune");
   btn.disabled = true;
   note.textContent = "Comparing against the game database…";
   try {
@@ -557,7 +560,7 @@ async function pruneSkills() {
       ? `Removed ${res.removed_count} unknown skill${res.removed_count === 1 ? "" : "s"} (${res.total} left)`
       : `Nothing to remove (${res.total} skills)`;
     if (res.removed_count) await loadSkillNames();
-    await showSkillsVersion(res.meta);
+    await showDataVersion(res.meta);
   } catch (e) {
     note.textContent = "Prune failed: " + e.message;
   } finally {
@@ -962,10 +965,10 @@ loadSkillNames();
 $("preset-load").onclick = applyPreset;
 $("preset-save").onclick = savePreset;
 $("preset-delete").onclick = deletePreset;
-$("skills-sync").onclick = () => syncSkills("");
-$("skills-prune").onclick = pruneSkills;
-showSkillsVersion();
-$("skills-sync-go").onclick = () => syncSkills($("skills-sync-path").value.trim());
+$("data-sync").onclick = () => updateGameData("");
+$("data-go").onclick = () => updateGameData($("data-path").value.trim());
+$("data-prune").onclick = pruneSkills;
+showDataVersion();
 loadPresets();
 $("skills").onchange = syncBlocks;
 $("reroll").onchange = syncBlocks;

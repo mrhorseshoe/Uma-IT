@@ -169,7 +169,7 @@ rerolls on roughly 99% of careers, which doubles the TP a loop consumes.
 The bot OCRs a skill name off the screen and fuzzy-matches it against a list of
 known names, so a skill it has never heard of cannot be bought and nothing says
 why. After a game update adds skills — a new umamusume, a new support card —
-press **Update from game files** in the skill section.
+press **Update data** in the Game data panel at the top of the dashboard.
 
 It reads the game's own `master.mdb`, which is the authority on these names, and
 adds anything the list is missing. It never removes anything. The first press
