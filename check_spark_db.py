@@ -170,6 +170,123 @@ for junk in (None, 'nonsense', 42, [[]], [[{'name': ''}]], [{'nope': 1}]):
     check(f"  {junk!r} yields no requirement", _skill_requirement_rows(junk) == [],
           str(_skill_requirement_rows(junk)))
 
+print("\nreading past the fold")
+# 62% of captured frames hid at least one row, up to nine of eighteen. A
+# targeted spark below the fold reads as absent, and that misreading is bought
+# at 30 TP. These drive the scroll with a fake list so the merge, the
+# termination and the refusal to guess are all exercised without the game.
+import uma_it.parse as parse_mod
+import uma_it.spark as spark_mod
+
+spark_mod.time.sleep = lambda *_: None
+parse_mod.time.sleep = lambda *_: None
+
+
+class FakeList:
+    """A spark list of `pages`, revealed a page at a time by swiping."""
+
+    def __init__(self, pages, moves=True):
+        self.pages, self.at, self.moves = pages, 0, moves
+        self.swipes = 0
+
+    def get_screen(self, to_gray=False):
+        return ('screen', self.at)
+
+    def swipe(self, **kw):
+        self.swipes += 1
+        if self.moves and self.at < len(self.pages) - 1:
+            self.at += 1
+
+    def click(self, *a, **k):
+        pass
+
+
+class ScrollCtx:
+    def __init__(self, fake):
+        self.ctrl = fake
+        self.current_screen = None
+
+
+def with_fake(fake, bottom_after_last=True):
+    parse_mod.spark_list_at_bottom = (
+        lambda img, tolerance=8: fake.at >= len(fake.pages) - 1)
+    spark_mod.spark_list_at_bottom = parse_mod.spark_list_at_bottom
+    parse_mod._parse_spark_rows_once = lambda ctx: fake.pages[fake.at]
+    parse_mod.parse_spark_rows = lambda ctx, attempts=3: fake.pages[fake.at]
+
+
+P1 = [white('Arima Kinen', 1), white('Lay Low', 1)]
+P2 = [white('Lay Low', 1), white('URA Finale', 2)]          # overlaps P1
+P3 = [white('URA Finale', 2), white('Fast-Paced', 3)]       # overlaps P2
+
+fake = FakeList([P1, P2, P3])
+with_fake(fake)
+rows = parse_mod.read_all_spark_rows(ScrollCtx(fake))
+names = [r['name'] for r in rows]
+check("every page is read", len(rows) == 4, str(names))
+check("  overlapping rows are merged, not duplicated",
+      names.count('Lay Low') == 1 and names.count('URA Finale') == 1, str(names))
+check("  and it stops at the bottom rather than swiping on",
+      fake.swipes == 2, f"{fake.swipes} swipes")
+
+# A list that will not move must not be swiped until the click guard trips.
+stuck = FakeList([P1, P2], moves=False)
+with_fake(stuck)
+rows = parse_mod.read_all_spark_rows(ScrollCtx(stuck))
+check("a list that does not move is given up on",
+      stuck.swipes == 1, f"{stuck.swipes} swipes")
+
+print("\nscrolling happens only when it could change the answer")
+RULE = [[{'name': 'Fast-Paced', 'stars': 3}]]
+SATISFIED = [[{'name': 'Arima Kinen', 'stars': 1}]]
+
+
+class T:
+    def __init__(self):
+        self.detail = type('D', (), {})()
+
+
+def decide(requirements, pages):
+    f = FakeList(pages)
+    with_fake(f)
+    ctx = ScrollCtx(f)
+    ctx.task = T()
+    rows, hit = spark_mod._decide(ctx, pages[0], {}, 'or', 3, requirements)
+    return f.swipes, hit
+
+
+swipes, hit = decide(SATISFIED, [P1, P2, P3])
+check("a rule the visible rows already satisfy does not scroll",
+      swipes == 0 and hit, f"{swipes} swipes, hit {hit!r}")
+
+swipes, hit = decide(RULE, [P1, P2, P3])
+check("a rule that needs a hidden row scrolls and finds it",
+      swipes > 0 and hit, f"{swipes} swipes, hit {hit!r}")
+
+swipes, hit = decide([], [P1, P2, P3])
+check("no white requirements never scrolls - blue and pink are always on top",
+      swipes == 0, f"{swipes} swipes")
+
+swipes, hit = decide([[{'name': 'Nothing Here', 'stars': 1}]], [P1, P2, P3])
+check("a spark in no page still reports no match", hit == '', repr(hit))
+
+
+# A scroll that throws must leave the decision on what was visible, and say so,
+# rather than letting an exception read as "the spark is not there".
+def boom(*a, **k):
+    raise RuntimeError("adb fell over")
+
+
+parse_mod.read_all_spark_rows = boom
+spark_mod.read_all_spark_rows = boom
+f = FakeList([P1, P2])
+with_fake(f)
+ctx = ScrollCtx(f)
+ctx.task = T()
+rows, hit = spark_mod._decide(ctx, P1, {}, 'or', 3, RULE)
+check("a failed scroll falls back to the visible rows without raising",
+      rows == P1 and hit == '', f"{len(rows)} rows, hit {hit!r}")
+
 print("\nthe version note covers the vocabulary too")
 from uma_it import skills_db
 _meta = {}

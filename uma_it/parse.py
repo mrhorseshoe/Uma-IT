@@ -492,11 +492,15 @@ SPARK_SCROLLBAR_SCAN = (190, 915)   # y range covering the list viewport
 
 
 def measure_spark_scrollbar(origin_img):
-    """Return (thumb_ratio, thumb_len, track_len, x) for the spark list
-    scrollbar, or None if none is visible (list fits one page). The scrollbar
-    is a muted low-saturation grey-purple column; saturated chip pixels from a
-    mid-slide carousel frame disqualify a column, so only settled frames read.
-    thumb_ratio = thumb_len/track_len; smaller => more sparks."""
+    """Return (thumb_ratio, thumb_len, track_len, x, thumb_start) for the spark
+    list scrollbar, or None if none is visible (list fits one page). The
+    scrollbar is a muted low-saturation grey-purple column; saturated chip
+    pixels from a mid-slide carousel frame disqualify a column, so only settled
+    frames read. thumb_ratio = thumb_len/track_len; smaller => more sparks.
+
+    `thumb_start` is the thumb's offset down the track, which is what says
+    whether the list has been scrolled to the end. The tuple grew at the end so
+    `m[0]` keeps meaning the ratio for every existing caller."""
     top, bot = SPARK_SCROLLBAR_SCAN
     h, w = origin_img.shape[:2]
     bot = min(bot, h)
@@ -514,16 +518,37 @@ def measure_spark_scrollbar(origin_img):
         if track_len < 300:
             continue
         thumb_mask = origin_img[top + track_top:top + track_bot, x].min(axis=1) < 195
-        # longest contiguous run of thumb pixels (the thumb is one block)
+        # longest contiguous run of thumb pixels (the thumb is one block), and
+        # where it starts - the run end against the track length is how far the
+        # list has been scrolled.
         best_run = run = 0
-        for v in thumb_mask:
-            run = run + 1 if v else 0
-            if run > best_run:
-                best_run = run
+        run_start = best_start = 0
+        for i, v in enumerate(thumb_mask):
+            if v:
+                if run == 0:
+                    run_start = i
+                run += 1
+                if run > best_run:
+                    best_run, best_start = run, run_start
+            else:
+                run = 0
         ratio = best_run / max(1, track_len)
         if best is None or track_len > best[2]:
-            best = (round(ratio, 3), int(best_run), track_len, x)
+            best = (round(ratio, 3), int(best_run), track_len, x, int(best_start))
     return best
+
+
+def spark_list_at_bottom(origin_img, tolerance: int = 8) -> bool:
+    """True when the spark list is scrolled to its end, or fits one page.
+
+    A list with no scrollbar is entirely visible, which is the same thing as
+    being at the bottom for the purpose of "have I seen everything".
+    """
+    m = measure_spark_scrollbar(origin_img)
+    if m is None:
+        return True
+    _ratio, thumb_len, track_len, _x, thumb_start = m
+    return (thumb_start + thumb_len) >= (track_len - tolerance)
 
 
 def spark_scrollbar_ratio(origin_img) -> float:
@@ -579,6 +604,66 @@ def spark_rows_check(rows: list[dict], targets, mode: str = 'or', default_min_st
             return blue_hit + ' + ' + pink_hit
         return ''
     return blue_hit or pink_hit
+
+
+# Where to drag to scroll the spark list, inside the viewport the scrollbar
+# scan covers. Deliberately short of a full page: about five rows of the nine
+# visible, so consecutive reads overlap by three or four and the merge has
+# something to stitch on even if the list flings past the drag.
+SPARK_LIST_SWIPE = (360, 860, 360, 460)
+
+# How many pages to read before giving up. The longest list seen across 277
+# captured frames was about 18 rows - three pages - so four is slack, not a
+# guess.
+SPARK_MAX_PAGES = 4
+
+
+def read_all_spark_rows(ctx, first_page=None) -> list:
+    """Every spark in the list, scrolling past the fold when there is one.
+
+    Blue and pink always sit in the top three rows, so nothing that targets
+    them needs this. White sparks are scattered through the list, and 62% of
+    captured frames hid at least one row - up to nine of eighteen. A target
+    below the fold reads as absent, which is a 30 TP reroll bought on a
+    misreading.
+
+    Merged by (colour, name, stars) because a fling can overshoot: the pages
+    overlap and the duplicates collapse. Stops at the scrollbar's end, or when
+    a swipe turns up nothing new, which is what a list that will not move looks
+    like.
+    """
+    merged, order = {}, []
+
+    def take(rows):
+        added = 0
+        for row in rows:
+            key = (row.get('color'), row.get('name'), row.get('stars'))
+            if key in merged:
+                continue
+            merged[key] = row
+            order.append(key)
+            added += 1
+        return added
+
+    take(first_page if first_page is not None else parse_spark_rows(ctx))
+    for page in range(SPARK_MAX_PAGES - 1):
+        screen = ctx.ctrl.get_screen()
+        if spark_list_at_bottom(screen):
+            break
+        x1, y1, x2, y2 = SPARK_LIST_SWIPE
+        ctx.ctrl.swipe(x1=x1, y1=y1, x2=x2, y2=y2, duration=1200,
+                       name="scroll the spark list")
+        time.sleep(1.2)
+        added = take(_parse_spark_rows_once(ctx))
+        if not added:
+            log.debug("Spark list did not move - stopping the scroll")
+            break
+    else:
+        if not spark_list_at_bottom(ctx.ctrl.get_screen()):
+            log.warning(f"🎲 Spark list still has rows below the fold after "
+                        f"{SPARK_MAX_PAGES} pages - deciding on "
+                        f"{len(order)} row(s)")
+    return [merged[k] for k in order]
 
 
 def spark_skill_rows_check(rows, requirements) -> str:

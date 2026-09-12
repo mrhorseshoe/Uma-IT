@@ -46,6 +46,8 @@ from uma_it.parse import (
     parse_factor,
     parse_spark_rows,
     parse_spark_selection_title,
+    read_all_spark_rows,
+    spark_list_at_bottom,
     spark_rule_check,
     spark_scrollbar_ratio,
 )
@@ -74,6 +76,36 @@ def _spark_reroll_active(ctx) -> bool:
     return bool(getattr(detail, 'spark_reroll_enabled', False)) \
         and bool(getattr(detail, 'spark_reroll_targets', None)
                  or getattr(detail, 'spark_skill_targets', None))
+
+def _decide(ctx, rows, targets, mode, min_stars, requirements):
+    """Evaluate the keep rule, reading past the fold only if that could change it.
+
+    Three reasons this does not simply always scroll. Hidden rows can only add
+    sparks, so a rule already satisfied stays satisfied. Blue and pink are
+    always in the top three rows, so a rule made only of those can never be
+    changed by scrolling. And dragging a list the game flings is the riskiest
+    thing here, so it earns its place only when the answer is otherwise "no".
+
+    Returns (rows_used, hit).
+    """
+    hit = spark_rule_check(rows, targets, mode, min_stars, requirements)
+    if hit or not requirements:
+        return rows, hit
+    try:
+        if spark_list_at_bottom(ctx.ctrl.get_screen()):
+            return rows, hit
+        log.info("🎲 No match in the visible sparks and the list runs on - "
+                 "scrolling to read the rest")
+        full = read_all_spark_rows(ctx, first_page=rows)
+    except Exception as e:
+        # A failed scroll must not read as "the spark is not there": say so.
+        log.warning(f"🎲 Could not read past the fold ({e}) - deciding on the "
+                    f"{len(rows)} visible row(s)")
+        return rows, hit
+    if len(full) > len(rows):
+        log.info(f"🎲 Read {len(full)} sparks in full: {_spark_rows_text(full)}")
+    return full, spark_rule_check(full, targets, mode, min_stars, requirements)
+
 
 def _spark_rows_text(rows) -> str:
     return ", ".join(f"{r['color'] or '?'}:{r['name'] or '?'}({r['canonical'] or '-'}) {r['stars']}*"
@@ -163,7 +195,7 @@ def script_factor_reroll(ctx):
         min_stars = getattr(detail, 'spark_reroll_min_stars', 3)
         mode = getattr(detail, 'spark_reroll_mode', 'or')
         wanted_skills = getattr(detail, 'spark_skill_targets', []) or []
-        hit = spark_rule_check(rows, targets, mode, min_stars, wanted_skills)
+        rows, hit = _decide(ctx, rows, targets, mode, min_stars, wanted_skills)
         if hit:
             log.info(f"🎲 Desired spark(s) '{hit}' present at the required stars - keeping this roll")
             d.spark_reroll_phase = 'keep'
@@ -236,7 +268,8 @@ def handle_spark_selection(ctx):
         rerolled_rows = parse_spark_rows(ctx)
         log.info(f"🎲 Rerolled sparks: {_spark_rows_text(rerolled_rows)}")
         wanted_skills = getattr(detail, 'spark_skill_targets', []) or []
-        hit = spark_rule_check(rerolled_rows, targets, mode, min_stars, wanted_skills)
+        rerolled_rows, hit = _decide(ctx, rerolled_rows, targets, mode,
+                                     min_stars, wanted_skills)
         if hit:
             choose_rerolled = True
             reason = f"rerolled set has {hit}"

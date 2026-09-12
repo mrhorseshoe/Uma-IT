@@ -171,6 +171,15 @@ in it are from the time each entry was written.
 
 ## Next
 
+- [ ] **Reading the spark list past the fold has never run against the game.**
+      `read_all_spark_rows` swipes and merges pages so a targeted white spark
+      below the fold is not read as absent - 62% of captured frames hid at
+      least one row, up to nine of eighteen. The merge, the termination and the
+      refusal to guess after a failed scroll are all pinned with fakes, and the
+      swipe path is drawn on a real frame to confirm it starts and ends inside
+      the list. What is untested is the game's own response: this list flings
+      rather than scrolling a fixed step, so the overshoot is the open
+      question. The pages overlap by three or four rows to absorb it
 - [ ] **The spark tiebreak when both lists fit one page** has no live coverage.
       `handle_spark_selection` counts rows when neither list overflows, which is
       exact, and falls back to total stars only on a genuine tie. That branch
