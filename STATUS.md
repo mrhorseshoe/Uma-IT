@@ -171,13 +171,17 @@ in it are from the time each entry was written.
 
 ## Next
 
-- [ ] **The keep branch of a white-spark rule has no live coverage.** Four
-      careers on 12 Sep 2026 all rerolled, correctly - the rule never held in
-      any of 18 reads, re-decided independently from the logs. The reroll,
-      the scroll and the AND between rows all ran live and were right; keeping
-      and spending nothing did not come up. A deliberately easy rule - one row,
-      one common spark at 1 star - would cover it for the price of one career
-      and no reroll
+- [x] **White spark targeting, proven end to end against the game** on
+      12 Sep 2026. Reading: 69 of 69 rows correct across five careers, each
+      checked against a capture of the frame it was read from, including 18
+      resolutions of OCR's capital O onto the game's grade circle and three
+      reads of a scenario spark. Deciding: four careers rerolled, all four
+      right, re-decided independently from the logged lists; three times a set
+      satisfied the first row and the bot correctly refused to call that a
+      match. Keeping: one career with a fourteen-alternative OR row kept on
+      `Arima Kinen 1*` in two milliseconds, spending nothing and - correctly -
+      not scrolling, since hidden rows can only add sparks to a rule already
+      satisfied
 - [x] **Reading the spark list past the fold** ran live on 12 Sep 2026: seven of
       eight reads scrolled, the eighth correctly skipped on a list that ended at
       nine rows. It also caught a merge bug - the overlap was keyed on raw OCR,
