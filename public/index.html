@@ -167,7 +167,14 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   margin-bottom: 6px; background: var(--bg);
 }
 .reqrow .chips { margin-bottom: 4px; }
-.reqrow input { width: 100%; font-size: 13px; }
+/* The theme's control styling is scoped to .field, and these live in .reqrow,
+   so without this the picker renders in the browser's default white against a
+   dark panel. */
+.reqrow select {
+  width: 100%; font: inherit; font-size: 13px;
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px;
+}
 .reqrow .orline { font-size: 11px; color: var(--muted); margin-bottom: 4px;
                   text-transform: uppercase; letter-spacing: 0.06em; }
 .reqjoin { font-size: 11px; color: var(--muted); text-transform: uppercase;
@@ -377,7 +384,6 @@ pre#log {
           <span class="hint" id="rule-readback">nothing targeted yet</span>
         </label>
       </div>
-      <datalist id="spark-names"></datalist>
       <div class="field">
         <label for="stopreroll">Stop at the reroll screen
           <span class="hint">Ends a single-run task there so you can reroll by hand</span>
@@ -610,22 +616,58 @@ async function pruneSkills() {
    list is ORed. The border in the markup is the only thing that says so, which
    is why the readback under it spells the rule out in words - a rule that
    reads wrong should be visible before it costs a 30 TP reroll. */
-let SPARK_NAMES = new Set();
+let SPARK_BY_KIND = {};
 let skillReqs = [];
+
+/* The pickable sparks, grouped the way the game groups them.
+
+   A dropdown rather than a text box with autocomplete: a typed name that is
+   not in the vocabulary can never match a screen read, and a rule containing
+   one looks exactly like a rule that simply did not hold. The select cannot
+   express that mistake. It also makes the four scenario sparks findable
+   without knowing they exist, which a text box does not.
+
+   Scenarios first, then races, then skills - smallest and most sought at the
+   top, since 234 skills would otherwise bury the four that matter most. */
+const SPARK_GROUPS = [["scenario", "Scenarios"], ["race", "Races"],
+                      ["skill", "Skills"], ["other", "Other"]];
 
 async function loadSparkNames() {
   try {
     const data = await api("/api/sparks").then((r) => r.json());
-    const names = (Array.isArray(data) ? data : []).map((s) => s && s.name).filter(Boolean);
-    SPARK_NAMES = new Set(names);
-    $("spark-names").replaceChildren(...names.map((n) => {
+    const by = {};
+    (Array.isArray(data) ? data : []).forEach((s) => {
+      if (!s || !s.name) return;
+      (by[s.kind] = by[s.kind] || []).push(s.name);
+    });
+    Object.values(by).forEach((list) => list.sort((a, b) => a.localeCompare(b)));
+    SPARK_BY_KIND = by;
+  } catch (e) {
+    // Leaves the picker empty rather than letting a stale list look current.
+  }
+  renderReqs();
+}
+
+function sparkPicker() {
+  const sel = document.createElement("select");
+  const first = document.createElement("option");
+  first.value = "";
+  first.textContent = "Add a spark…";
+  sel.append(first);
+  SPARK_GROUPS.forEach(([kind, label]) => {
+    const names = SPARK_BY_KIND[kind] || [];
+    if (!names.length) return;
+    const group = document.createElement("optgroup");
+    group.label = `${label} (${names.length})`;
+    names.forEach((n) => {
       const o = document.createElement("option");
       o.value = n;
-      return o;
-    }));
-  } catch (e) {
-    // The picker still accepts a typed name; only autocomplete is lost.
-  }
+      o.textContent = n;
+      group.append(o);
+    });
+    sel.append(group);
+  });
+  return sel;
 }
 
 function renderReqs() {
@@ -665,23 +707,17 @@ function renderReqs() {
       chips.append(chip);
     });
     box.append(chips);
-    const input = document.createElement("input");
-    input.type = "text";
-    input.setAttribute("list", "spark-names");
-    input.placeholder = entries.length ? "or…" : "Add a spark…";
-    const take = () => {
-      const name = input.value.trim();
+    const pick = sparkPicker();
+    if (entries.length) pick.firstChild.textContent = "or…";
+    pick.onchange = () => {
+      const name = pick.value;
       if (name && !entries.some((e) => e.name === name)) {
         entries.push({ name: name, stars: 1 });
       }
-      input.value = "";
+      pick.value = "";
       renderReqs();
     };
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") { e.preventDefault(); take(); }
-    });
-    input.addEventListener("input", () => { if (SPARK_NAMES.has(input.value)) take(); });
-    box.append(input);
+    box.append(pick);
     host.append(box);
   });
   showReadback();
