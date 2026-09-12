@@ -187,6 +187,30 @@ def script_factor_reroll(ctx):
         ctx.ctrl.click_by_point(CULTIVATE_FACTOR_REROLL_SKIP)
         return
 
+    # Rerolling switched on with nothing targeted: read the roll anyway and say
+    # what it was. This decides nothing and clicks nothing - the skip below
+    # still runs - but without it the screen goes by unexamined, and "what did
+    # the bot see" is the only question worth asking about a spark reader.
+    # Once per career; the flag lives on the run context, which is rebuilt each
+    # time.
+    if (getattr(detail, 'spark_reroll_enabled', False)
+            and not _spark_reroll_active(ctx)
+            and not getattr(d, 'spark_read_logged', False)):
+        d.spark_read_logged = True
+        try:
+            _save_spark_debug(ctx, "readonly")
+            rows = parse_spark_rows(ctx)
+            log.info(f"🎲 Sparks read, nothing targeted: {_spark_rows_text(rows)}")
+            if spark_list_at_bottom(ctx.ctrl.get_screen()):
+                log.info("🎲 Whole list visible - nothing below the fold")
+            else:
+                full = read_all_spark_rows(ctx, first_page=rows)
+                _save_spark_debug(ctx, "readonly_scrolled")
+                log.info(f"🎲 Read past the fold: {len(rows)} visible -> "
+                         f"{len(full)} in full: {_spark_rows_text(full)}")
+        except Exception as e:
+            log.warning(f"🎲 Read-only spark read failed: {e}")
+
     if _spark_reroll_active(ctx) and getattr(d, 'spark_reroll_phase', '') == '':
         time.sleep(1)
         rows = parse_spark_rows(ctx)
