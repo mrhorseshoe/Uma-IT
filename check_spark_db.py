@@ -226,6 +226,31 @@ names = [r['name'] for r in rows]
 check("every page is read", len(rows) == 4, str(names))
 check("  overlapping rows are merged, not duplicated",
       names.count('Lay Low') == 1 and names.count('URA Finale') == 1, str(names))
+
+# The same row read on two overlapping pages comes back spelled differently.
+# Live on 12 Sep: 'enno Sho (Autumn)' and 'ennoSho (Autumn)', 'edShift/LP1211-M'
+# and 'ed Shift/LP1211-M'. Keyed on the raw OCR both survived and a ten-row
+# list read as twelve, which would then lose the count-based tiebreak.
+SAME_A = [{'name': 'enno Sho (Autumn)', 'canonical': 'Tenno Sho (Autumn)',
+           'stars': 1, 'color': 'white', 'y': 0}]
+SAME_B = [{'name': 'ennoSho (Autumn)', 'canonical': 'Tenno Sho (Autumn)',
+           'stars': 1, 'color': 'white', 'y': 0}]
+dup = FakeList([SAME_A, SAME_B])
+with_fake(dup)
+rows = parse_mod.read_all_spark_rows(ScrollCtx(dup))
+check("  one row spelled two ways is still one row", len(rows) == 1,
+      str([r['name'] for r in rows]))
+
+# And with no canonical to lean on, letters-only still collapses a lost space.
+UNRES_A = [{'name': 'edShift/LP1211-M', 'canonical': '', 'stars': 2,
+            'color': 'green', 'y': 0}]
+UNRES_B = [{'name': 'ed Shift/LP1211-M', 'canonical': '', 'stars': 2,
+            'color': 'green', 'y': 0}]
+dup2 = FakeList([UNRES_A, UNRES_B])
+with_fake(dup2)
+rows = parse_mod.read_all_spark_rows(ScrollCtx(dup2))
+check("  and an unresolved row spelled two ways is one row", len(rows) == 1,
+      str([r['name'] for r in rows]))
 check("  and it stops at the bottom rather than swiping on",
       fake.swipes == 2, f"{fake.swipes} swipes")
 

@@ -632,12 +632,30 @@ def read_all_spark_rows(ctx, first_page=None) -> list:
     a swipe turns up nothing new, which is what a list that will not move looks
     like.
     """
+    from uma_it.spark_db import _letters
+    from uma_it.skills_db import merge_key
     merged, order = {}, []
+
+    def identity(row):
+        """What makes two reads the same row.
+
+        Not the raw OCR: the same row read on two overlapping pages comes back
+        spelled differently. Live on 12 Sep the overlap produced
+        'enno Sho (Autumn)' and 'ennoSho (Autumn)', and 'edShift/LP1211-M'
+        against 'ed Shift/LP1211-M' - one space apart, two entries kept, the
+        list inflated from ten rows to twelve.
+
+        The canonical is the normalisation that already handles this, so use it
+        where there is one; letters-only on the raw name otherwise, which is
+        what collapses a dropped space.
+        """
+        name = row.get('canonical') or row.get('name') or ''
+        return (row.get('color'), _letters(merge_key(name)), row.get('stars'))
 
     def take(rows):
         added = 0
         for row in rows:
-            key = (row.get('color'), row.get('name'), row.get('stars'))
+            key = identity(row)
             if key in merged:
                 continue
             merged[key] = row
