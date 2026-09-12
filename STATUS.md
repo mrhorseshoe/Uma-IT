@@ -171,7 +171,19 @@ in it are from the time each entry was written.
 
 ## Next
 
-- [ ] **Reading the spark list past the fold has never run against the game.**
+- [ ] **The keep branch of a white-spark rule has no live coverage.** Four
+      careers on 12 Sep 2026 all rerolled, correctly - the rule never held in
+      any of 18 reads, re-decided independently from the logs. The reroll,
+      the scroll and the AND between rows all ran live and were right; keeping
+      and spending nothing did not come up. A deliberately easy rule - one row,
+      one common spark at 1 star - would cover it for the price of one career
+      and no reroll
+- [x] **Reading the spark list past the fold** ran live on 12 Sep 2026: seven of
+      eight reads scrolled, the eighth correctly skipped on a list that ended at
+      nine rows. It also caught a merge bug - the overlap was keyed on raw OCR,
+      so one row spelled two ways survived twice and a thirteen-row list read as
+      fifteen. Keyed on the canonical now; the next two careers came back clean
+- [ ] ~~Reading the spark list past the fold has never run against the game.~~
       `read_all_spark_rows` swipes and merges pages so a targeted white spark
       below the fold is not read as absent - 62% of captured frames hid at
       least one row, up to nine of eighteen. The merge, the termination and the
