@@ -444,7 +444,17 @@ def _parse_spark_rows_once(ctx) -> list[dict]:
                     stars += 1
                 else:
                     break
-        rows.append({'name': name, 'canonical': match_spark_target_name(name),
+        # Two namespaces, picked by colour. Blue and pink are the fifteen stat
+        # and aptitude names; white is the game's spark table, which is where
+        # the skill, race and scenario sparks live and the only place a name
+        # like 'URA Finale' exists. Green (a unique skill) is left unresolved -
+        # nothing can target it.
+        if color == 'white':
+            from uma_it.spark_db import resolve_name
+            canonical = resolve_name(name)
+        else:
+            canonical = match_spark_target_name(name)
+        rows.append({'name': name, 'canonical': canonical,
                      'stars': stars, 'color': color, 'y': int(pos[0][1])})
     rows.sort(key=lambda x: x['y'])
     return rows
@@ -550,6 +560,12 @@ def spark_rows_check(rows: list[dict], targets, mode: str = 'or', default_min_st
     blue_hit = ''
     pink_hit = ''
     for row in rows:
+        # Only a blue or pink row can satisfy a blue or pink target. White rows
+        # now carry a canonical name too, and the branch below files anything
+        # that is not a blue key under pink - so without this guard a skill
+        # spark sharing a name with an aptitude would count as that aptitude.
+        if row.get('color') not in ('blue', 'pink'):
+            continue
         name = (row.get('canonical') or '').lower()
         if name in norm and row.get('stars', 0) >= norm[name]:
             if name in SPARK_BLUE_KEYS:

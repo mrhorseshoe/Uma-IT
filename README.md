@@ -185,7 +185,12 @@ aliases of graded skills, since `Corner Acceleration` is what OCR produces for
 the game's `Corner Acceleration ○`, and refuses outright if the database reads
 back implausibly small rather than emptying your list.
 
-The line above the buttons says which game version the list is current to —
+Pressing it also refreshes the **spark vocabulary** - every spark the game
+can inherit, exported from its `succession_factor` table. That is a different
+namespace from the skill list and the only place the race and scenario sparks
+exist, so `URA Finale` is in it and in no skill list.
+
+The line above the buttons says which game version the lists are current to —
 `521 skills, current to game 1.35.0, data 2026-09-03`. The failure this prevents
 is a silent one: a skill added by an update simply never gets bought, and
 nothing says why. If that line is behind the version you are running, press the

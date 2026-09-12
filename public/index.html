@@ -490,7 +490,8 @@ async function showSkillsVersion(meta) {
     if (!meta || !meta.skills) { el.textContent = ""; return; }
     const ver = meta.game_version ? `game ${meta.game_version}` : "unknown game version";
     const when = meta.master_mdb_date ? `, data ${meta.master_mdb_date}` : "";
-    el.textContent = `${meta.skills} skills, current to ${ver}${when}`;
+    const sp = meta.sparks ? ` and ${meta.sparks} sparks` : "";
+    el.textContent = `${meta.skills} skills${sp}, current to ${ver}${when}`;
   } catch (e) {
     el.textContent = "";
   }

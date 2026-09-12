@@ -381,9 +381,17 @@ def sync(hint: str = '') -> dict:
         # restart - and the button looks like it did nothing.
         reset_skills_database_cache()
 
+    # The spark vocabulary comes out of the same file and goes stale for the
+    # same reason, so one press keeps both current. Separate list, separate
+    # namespace - see uma_it/spark_db.py.
+    from uma_it import spark_db
+    sparks = spark_db.sync_from(mdb)
+
     remember_source(mdb)
     meta = write_meta(mdb, len(existing), 'synced')
+    meta['sparks'] = sparks['total']
     log.info(f"Skill list synced from {mdb}: {len(added)} new, "
              f"{len(existing)} total (game {meta.get('game_version') or '?'})")
     return {'ret': 0, 'source': mdb, 'added': added,
-            'added_count': len(added), 'total': len(existing), 'meta': meta}
+            'added_count': len(added), 'total': len(existing), 'meta': meta,
+            'sparks_added': sparks['added_count'], 'sparks_total': sparks['total']}
