@@ -1,109 +1,90 @@
 # Uma-IT
 
-A streamlined bot that loops **Independent Training** careers in Umamusume:
-Pretty Derby (Global).
-
-Independent Training is the mode where the game plays a career itself: you
-configure the run, start it, and collect the result about fifty minutes later.
-This bot does that on a loop — enter a career, load the race agenda, wait out
-the run, buy skills, handle the sparks, start the next one — and deliberately
-does nothing else.
+A bot that loops **Independent Training** careers in Umamusume: Pretty Derby
+(Global) — enter a career, load the race agenda, wait out the run, buy skills,
+handle the sparks, start the next one. It deliberately does nothing else.
 
 There is no game API. Everything is OpenCV template matching and PaddleOCR over
 screenshots, with taps sent through uiautomator2 over ADB.
 
-## What one loop does
+Descended from [UAT-Global-Server](https://github.com/mrhorseshoe/UAT-Global-Server),
+itself a fork of [TomerGamerTV/UAT-Global-Server](https://github.com/TomerGamerTV/UAT-Global-Server).
+That project plays a full turn-by-turn career; this one only loops Independent
+Training, and is a fresh, much smaller build rather than a fork. See
+[What changed](#what-changed) below.
 
-1. From Home, open CAREER and pick the scenario and trainee
-2. Borrow a support card by name, matched against the card on screen
-3. Load your saved race agenda from slot 1 and confirm the run
-4. Wait out the ~50 minute Independent Training countdown
-5. Collect the result screens
-6. Buy skills, sweeping repeatedly until nothing affordable is left
-7. Read the end-of-career sparks and optionally reroll them
-8. Restore TP if the task allows it, then start the next career
+## Features
 
-The process restarts itself after every career, so anything that has to
-survive — loop counts, scheduler state, the task itself — is written to
-`userdata/` and reloaded at boot.
+**Loops careers unattended.** Home → scenario → trainee → borrow a support card
+by name → load your saved agenda → wait out the ~50 minute run → collect →
+repeat. The process restarts itself after every career, so loop counts,
+scheduler state and the task survive in `userdata/`.
 
-## Status
+**Buys skills, and does not leave points behind.** Sweeps the skill screen
+repeatedly, because learning one unlocks others, until nothing affordable is
+left. Typical result: 4,100 points down to single digits. Priorities are yours
+in three tiers, with a blacklist, saved as named presets.
 
-Working. On 11 September 2026 it completed five consecutive careers across two
-loops with no errors, including the first careers in which skill buying and
-spark reroll both ran end to end.
+**Rerolls sparks against a rule you write.** Targets can be:
 
-Verified against the live game:
+- **blue** (the five stats) and **pink** (the ten aptitudes), each with a
+  minimum star level;
+- **white** — skills, races and *scenario* sparks like `URA Finale` — as
+  requirement rows: every row must hold, any one entry satisfies its row. One
+  entry per row is a pure AND, one row holding everything is a pure OR, so
+  there is no operator precedence to guess at. A plain-English readback under
+  the builder states the rule back to you.
 
-- **Skill buying** spends the budget down to whatever is cheaper than the
-  cheapest remaining skill — 4108 points to 3 in one career, 4057 to 71 in
-  another — across repeated passes, because learning a skill unlocks more.
-- **Spark reroll** rerolls when the star criteria are not met, keeps the roll
-  when they are, and when neither set qualifies keeps the set with the most
-  sparks. All three branches were observed and each decision was recomputed
-  independently from the logs.
-- **TP restore** prefers a TP item and falls back to carats, and never spends a
-  chocolate item.
+It reads the whole list, scrolling past the fold when a target could be hiding
+below it, and when neither roll qualifies it keeps the set with more sparks.
 
-See [STATUS.md](STATUS.md) for the checklist and [DESIGN.md](DESIGN.md) for how
-it is put together and which rules exist because something once broke.
+**Restores TP** from a TP item when you hold one, carats otherwise, and never
+spends a chocolate item. One switch governs all spending.
+
+**Keeps its own data current.** One **Update data** button reads the game's
+`master.mdb` and refreshes both the skill list and the spark vocabulary, and the
+dashboard says which game version they are current to.
+
+**A dashboard with no build step** — one HTML file, no framework, no CDN, works
+offline.
 
 ## Install
 
-### 1. Python 3.10, specifically
-
-The bot needs **Python 3.10**. Install it from
-[python.org](https://www.python.org/downloads/) with the **py launcher** option
-ticked, then check:
+**1. Python 3.10, specifically.** Install from
+[python.org](https://www.python.org/downloads/) with the **py launcher** ticked:
 
 ```bash
 py -3.10 --version
 ```
 
 It must be `py -3.10`, not `python`. A bare `python` picks up whatever is first
-on PATH and fails at `import cv2` with a message that says nothing about why.
+on PATH and fails at `import cv2` with a message that says nothing about why;
 `main.py` refuses to start under any other version rather than failing that way.
 
-### 2. Get the code
+**2. Get the code.**
 
 ```bash
 git clone https://github.com/mrhorseshoe/Uma-IT.git
 ```
 
-### 3. Install the packages
+**3. Install the packages.**
 
 ```bash
 py -3.10 -m pip install -r requirements.txt
 ```
 
-Two things to know about that file:
+Two things about that file: it is inherited from the parent project and installs
+more than this bot uses, and it pins `paddlepaddle-gpu`, which needs a CUDA
+card. **Without one, install `paddlepaddle` instead** — the bot detects what is
+available and logs which it used at startup. Packages must land in system Python
+3.10's site-packages, not a virtualenv.
 
-- It is inherited from the parent project and installs more than this bot uses.
-  What is actually imported is `opencv-python`, `numpy`, `paddleocr`,
-  `uiautomator2`, `fastapi`, `uvicorn`, `pydantic`, `PyYAML`, `psutil`,
-  `colorlog`, `croniter`, `plyer` and `requests`.
-- It pins `paddlepaddle-gpu`, which needs a CUDA-capable GPU. **Without one,
-  install `paddlepaddle` instead** — the bot detects what is available and logs
-  which it is using at startup.
+**4. An Android emulator** at **720x1280** with ADB debugging, running
+Umamusume: Pretty Derby (Global). `deps/adb/adb.exe` ships with the repo.
 
-Packages must land in system Python 3.10's site-packages, not a virtualenv,
-because that is where `py -3.10` looks.
-
-### 4. An Android emulator
-
-- Resolution **720x1280**, with ADB debugging enabled
-- Umamusume: Pretty Derby (Global), package `com.cygames.umamusume`
-- Reachable over ADB — `deps/adb/adb.exe` ships with the repo, so there is
-  nothing to install separately
-
-### 5. Set the game up once
-
-The bot does not configure these for you:
-
-- Put the race agenda you want in **slot 1** of My Agendas. Selection is always
-  slot 1; there is no task setting for it, and two earlier designs that tried to
-  pick by name or by position both silently ran the wrong schedule.
-- Have the support card you want to borrow available to follow.
+**5. Two things to set up in-game**, which the bot will not do for you: put the
+race agenda you want in **slot 1** of My Agendas, and have the support card you
+want to borrow available to follow.
 
 ## Running it
 
@@ -113,169 +94,110 @@ Double-click `start.bat`, or:
 py -3.10 main.py
 ```
 
-Pick the emulator when asked. The dashboard opens on <http://127.0.0.1:8071> —
-a single HTML file with no build step, so you can edit `public/index.html` and
-reload.
+Pick the emulator when asked; the dashboard opens on <http://127.0.0.1:8071>.
 
-**Starting the process starts the loop.** If a saved task restores and there is
-no recorded scheduler state, the scheduler starts — which is what lets the loop
-survive the soft restart it performs after every career. To restart without
-running a career, stop it from the dashboard once it is up.
+**Starting the process starts the loop** — that is what lets a run survive the
+soft restart after each career. To come up without running one, stop it from the
+dashboard once it is up. **Stop it from the dashboard, not by killing the
+process**: run counts only reach disk when a run ends.
 
-**Stop it from the dashboard, not by killing the process.** Run counts and
-scheduler flags only reach disk when a run ends.
-
-### Reaching the dashboard from another device
-
-It binds to `127.0.0.1` deliberately. To reach it from a phone without exposing
-it to your LAN, put it behind [Tailscale](https://tailscale.com):
-
-```bash
-tailscale serve --bg 8071
-```
-
-The dashboard has **no authentication** and can start and stop the bot, edit the
-task and authorise spending, so anything that can reach it can drive it.
+To reach it from a phone without exposing it to your LAN, put it behind
+[Tailscale](https://tailscale.com) with `tailscale serve --bg 8071`. The
+dashboard has **no authentication** — anything that can reach it can drive the
+bot and authorise spending.
 
 ## Configuring a run
 
-Everything is set from the dashboard. The task carries 14 user-facing settings:
+Everything is set from the dashboard. The task carries 15 user-facing settings:
+the scenario, the card to borrow, whether to keep the last parents, the loop
+count, whether to restore TP, four for skill buying and six for spark reroll.
 
-| setting | what it does |
-| --- | --- |
-| `scenario` | which career scenario to start |
-| `follow_support_card_name` | the card to borrow, matched by OCR against the name |
-| `use_last_parents` | keep the previous parents rather than letting the game pick |
-| `loop_count` | careers to run, `0` for until stopped |
-| `allow_recover_tp` | `0` fails a career rather than paying; above `0` restores TP, carats included |
-| `skip_learn_skill` | turn skill buying off |
-| `learn_skill_list` | three priority tiers, bought in order |
-| `learn_skill_blacklist` | never buy these |
-| `learn_skill_only_user_provided` | buy only what is listed, ignoring leftovers |
-| `spark_reroll_enabled` | turn spark reroll on |
-| `spark_reroll_targets` | spark name to minimum stars |
-| `spark_skill_targets` | white spark requirement rows: every row must hold, any entry satisfies its row |
-| `spark_reroll_mode` | `or` needs a hit in either group, `and` in both |
-| `spark_reroll_min_stars` | default minimum for targets that do not set their own |
-| `stop_at_spark_reroll` | stop on the sparks screen so you can reroll by hand |
+A reroll costs **30 TP**, the same as a career, so the targets decide what a
+loop costs. A single 3★ spark rerolls on roughly 99% of careers; a row of
+several common sparks at 1★ keeps most of the time. Measured over 140 captured
+rolls, two specific skills co-occur in about 2–4% of them while any-of-five
+lands near 56%.
 
-Skill configurations can be saved as named presets, stored per-file under
-`userdata/skill_presets/`.
+### Keeping the game data current
 
-Note that a reroll costs **30 TP**, the same as a career. Targeting a 3★ spark
-rerolls on roughly 99% of careers, which doubles the TP a loop consumes.
+The bot matches an OCR'd name against a list, so a skill or spark it has never
+heard of cannot be targeted and nothing says why. After a game update, press
+**Update data** in the Game data panel. It reads the game's own `master.mdb` —
+the authority on these names — and adds what is missing, never removing
+anything. The first press looks in the usual place and only asks for the folder
+if that fails, remembering it afterwards.
 
-### Keeping the skill list current
+The repository ships a baseline of **521 skills and 389 sparks**, current to
+game **1.35.0**; updates are written to `userdata/`, which is gitignored, so
+keeping yours current is up to you. **Remove unknown skills** does the opposite,
+dropping entries the game does not have — a scraped list carries names that can
+still win a frame from the real one.
 
-The bot OCRs a skill name off the screen and fuzzy-matches it against a list of
-known names, so a skill it has never heard of cannot be bought and nothing says
-why. After a game update adds skills — a new umamusume, a new support card —
-press **Update data** in the Game data panel at the top of the dashboard.
+## What changed
 
-It reads the game's own `master.mdb`, which is the authority on these names, and
-adds anything the list is missing. It never removes anything. The first press
-looks in the usual place; if your install is somewhere else it asks for the
-folder, and remembers it afterwards. You can give it the game folder, the folder
-holding `master.mdb`, or the file itself.
-
-**Remove unknown** does the opposite: it drops entries for skills the game's
-database does not have. A scraped list carries names the game never shows, and
-they are not free — the matcher scores an OCR'd name against every candidate, so
-a name that cannot appear on screen can still win a frame. It keeps un-suffixed
-aliases of graded skills, since `Corner Acceleration` is what OCR produces for
-the game's `Corner Acceleration ○`, and refuses outright if the database reads
-back implausibly small rather than emptying your list.
-
-Pressing it also refreshes the **spark vocabulary** - every spark the game
-can inherit, exported from its `succession_factor` table. That is a different
-namespace from the skill list and the only place the race and scenario sparks
-exist, so `URA Finale` is in it and in no skill list.
-
-The line above the buttons says which game version the lists are current to —
-`521 skills, current to game 1.35.0, data 2026-09-03`. The failure this prevents
-is a silent one: a skill added by an update simply never gets bought, and
-nothing says why. If that line is behind the version you are running, press the
-button.
-
-**Your list is yours.** The repository ships a baseline at
-`resource/uma_it/skills.json` — 521 entries covering every skill in game version
-**1.35.0** — and never receives updates; a sync writes to
-`userdata/skills.json`, which is gitignored and shadows the shipped one. Keeping
-it current after a game update is up to you. Delete that file to fall back to
-the baseline.
-
-## What changed from UAT-Global-Server
-
-This is a fresh, much smaller project rather than a fork of
-[UAT-Global-Server](https://github.com/mrhorseshoe/UAT-Global-Server). The
-parent automates a turn-by-turn career — training choices, races, events, moods,
-support-card bonds — and Independent Training makes almost all of that
-unnecessary. An IT career touches 22 of the parent's 56 screens.
+An Independent Training career touches 22 of the parent's 56 screens, so almost
+none of its turn-by-turn machinery is needed.
 
 |  | UAT-Global-Server | Uma-IT |
 | --- | --- | --- |
-| task settings | 46 | 16 (14 user-facing) |
+| task settings | 46 | 17 |
 | UI templates | 574 | 54 |
-| web UI | Vue 3 + Vite with the build output committed; `TaskEditModal.vue` alone is 5,330 lines | one 874-line HTML file, no build step |
+| web UI | Vue 3 + Vite, build output committed; `TaskEditModal.vue` alone is 5,330 lines | one HTML file, no build step |
 | external assets | Bootstrap and jQuery from a CDN | none — works offline |
-| dialog handling | one `TITLE` list; an unmatched dialog falls to a blind corner click | 29 titles with explicit handlers, scored against 30 decoys that deliberately lose |
-| tests | none tracked | 17 check scripts |
+| dialogs | one `TITLE` list; anything unmatched gets a blind corner click | 29 titles with handlers, scored against 30 decoys that deliberately lose |
+| tests | none tracked | 19 check scripts |
 
-The substantive differences:
+**Every screen is named.** An unhandled dialog in the parent looks exactly like
+a handled one, because the fallback silently clears it. Here the scoring set
+also holds titles the bot does *not* act on, so they win their own frames rather
+than a shorter title of ours stealing them — which took `Unknown option box`
+warnings from four per career to zero.
 
-**Every screen is named.** The parent dispatches dialogs by OCR'd title against
-a list of the titles it acts on, so a screen it does not know gets cleared by a
-blind corner click — which works, but means an unhandled screen looks exactly
-like a handled one. Here the scoring set also holds 30 titles the bot does *not*
-act on, precisely so they win their own frames instead of a shorter title of ours
-stealing them. Across 26 careers that took `Unknown option box` warnings from
-four per career to zero.
+**Settings exist once.** In the parent each lives on both the task and the run
+context, so adding one meant editing four files. Here handlers read
+`ctx.task.detail` directly.
 
-**Settings exist once.** In the parent every setting lives on both the task and
-the run context, so adding one meant editing four files with the copy step the
-easy one to forget. Here handlers read `ctx.task.detail` directly.
+**Skill buying does not stop early.** The parent breaks at the first
+unaffordable skill, so a 300-point budget facing a 400-point skill bought
+nothing at all.
 
-**Skill buying does not stop early.** The parent breaks out of its loop at the
-first unaffordable skill, so a 300-point budget facing a 400-point skill bought
-nothing at all. This one skips it and carries on, and reports what it could not
-spend.
+**Sparks are matched against the game's own factor table**, not a skill list, so
+race and scenario sparks can be targeted at all.
 
-**One switch for spending.** The parent has separate flags for TP recovery and
-for the reroll's TP prompt, which have to agree. Here `allow_recover_tp` governs
-both.
-
-**Dropped deliberately**, with the reasons recorded in `uma_it/task.py`: the
-support card level filter (its OCR read 150 for a card that caps at 50, so it
-passed everything), the mid-career skill threshold (there are no turns here),
-manual purchase pauses, and a separate carat flag for rerolls.
+**Dropped deliberately**, with reasons recorded in `uma_it/task.py`: the support
+card level filter (its OCR read 150 for a card that caps at 50), the mid-career
+skill threshold (there are no turns here), manual purchase pauses, and a
+separate carat flag for rerolls.
 
 The parent remains the place to look for anything this one does not do,
 including normal-career play.
 
 ## Development
 
-There is no test framework. Instead there are 18 `check_*.py` scripts at the
-repo root, each driving real functions with fakes and asserting on the clicks and
-decisions they produce:
+No test framework: 19 `check_*.py` scripts at the repo root drive real functions
+with fakes and assert on the clicks and decisions they produce.
 
 ```bash
 py -3.10 check_skills.py
 ```
 
-They are written to fail if the behaviour they describe regresses — several were
-added after a bug reached the live game, and each states the failure it exists to
-catch. Run them all before committing.
+Several were added after a bug reached the live game, and each states the
+failure it exists to catch. Run them all before committing.
 
-Screen handlers are best checked against real captures. Grab a frame over ADB and
-run the handler against the saved PNG with a fake controller:
+Screen handlers are best checked against real captures — grab a frame and run
+the handler against the PNG with a fake controller:
 
 ```bash
 deps/adb/adb.exe -s emulator-5554 exec-out screencap -p > shot.png
 ```
 
-Such scripts must `os.chdir` to the repo root — templates resolve relative to the
+Such scripts must `os.chdir` to the repo root: templates resolve relative to the
 working directory, and templates that fail to load silently make every screen
 look unrecognised.
+
+See [DESIGN.md](DESIGN.md) for how it is put together and which rules exist
+because something once broke, and [STATUS.md](STATUS.md) for what is proven and
+what is still open.
 
 ## Known limits
 
@@ -285,13 +207,6 @@ look unrecognised.
 - **Windows in practice** — the bundled ADB is `adb.exe` and the launcher is a
   `.bat`, though nothing in the bot logic is platform-specific.
 
-## Requirements
-
-- Python 3.10, reachable as `py -3.10`
-- An Android emulator at 720x1280 with ADB debugging
-- Umamusume: Pretty Derby (Global)
-- A CUDA GPU is optional; PaddleOCR runs on CPU
-
 ## License
 
 [MIT](LICENSE), covering this project's own code — everything under `uma_it/`,
@@ -299,10 +214,9 @@ look unrecognised.
 
 **The engine under `bot/` is vendored** from
 [UAT-Global-Server](https://github.com/mrhorseshoe/UAT-Global-Server), which
-descends in turn from
+descends from
 [TomerGamerTV/UAT-Global-Server](https://github.com/TomerGamerTV/UAT-Global-Server)
-and an upstream CN project before that — parts of it still carry Chinese
-comments from that lineage. **Neither of those repositories publishes a
-license**, so the terms on that code are whatever their authors' default
-copyright is, not MIT. If you intend to reuse `bot/`, take that up with them
-rather than relying on this file.
+and an upstream CN project before that. **Neither of those repositories
+publishes a license**, so the terms on that code are their authors' default
+copyright, not MIT. If you intend to reuse `bot/`, take that up with them rather
+than relying on this file.
