@@ -73,6 +73,10 @@ class CareerContext:
         # delete them from the user's saved preset permanently. None until the
         # first pass copies it.
         self.remaining_skills = None
+        # Priority circle skills this career has clicked, as
+        # `skills.circle_base` keys. OCR reads ○ and ◎ alike, so this is how a
+        # later pass knows a circle row is the ◎ upgrade to buy first.
+        self.circle_skills: set = set()
         self.learn_skill_done: bool = False
         self.learn_skill_selected: bool = False
         self.final_skill_sweep_active: bool = False
@@ -99,6 +103,9 @@ class CareerContext:
         self.spark_reroll_phase: str = ''
         self.spark_reroll_clicks: int = 0
         self.spark_reroll_result: dict = {}
+        # Roll 1 as read on the reroll screen, past the fold when it had to be.
+        # The selection screen's own read of that set stops at the fold.
+        self.spark_roll1_rows: list = []
         self.spark_reroll_abort_tries: int = 0
         self.spark_reroll_recover_tries: int = 0
 

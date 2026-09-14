@@ -220,6 +220,9 @@ def script_factor_reroll(ctx):
         mode = getattr(detail, 'spark_reroll_mode', 'or')
         wanted_skills = getattr(detail, 'spark_skill_targets', []) or []
         rows, hit = _decide(ctx, rows, targets, mode, min_stars, wanted_skills)
+        # The selection screen's "original" set is this roll, and this read may
+        # have gone past the fold; the read made there never does.
+        d.spark_roll1_rows = rows
         if hit:
             log.info(f"🎲 Desired spark(s) '{hit}' present at the required stars - keeping this roll")
             d.spark_reroll_phase = 'keep'
@@ -315,6 +318,16 @@ def handle_spark_selection(ctx):
             else:
                 original_rows = parse_spark_rows(ctx)
                 log.info(f"🎲 Original sparks: {_spark_rows_text(original_rows)}")
+                # Both sets have to be counted the same way. The rerolled set
+                # was read past the fold by `_decide`, and the read just made
+                # stops at the fold - so on 14 Sep a 13-vs-13 tie compared 21
+                # stars against 13, the original's 9 visible rows. Roll 1 is
+                # the same set and was read in full on the reroll screen.
+                roll1 = getattr(d, 'spark_roll1_rows', None) or []
+                if len(roll1) > len(original_rows):
+                    log.info(f"🎲 Counting the original set from roll 1's full read "
+                             f"({len(roll1)} rows; {len(original_rows)} visible here)")
+                    original_rows = roll1
                 ratio_original = spark_scrollbar_ratio(ctx.ctrl.get_screen())
                 log.info(f"🎲 Neither set has a desired spark - scrollbar thumb: "
                          f"rerolled {ratio_rerolled:.2f} vs original {ratio_original:.2f} "

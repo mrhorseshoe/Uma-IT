@@ -815,10 +815,36 @@ def jaccard_counter_ratio(a: Counter, b: Counter) -> float:
     return inter / union if union else 0.0
 
 
+# A skill's grade symbol as it survives OCR: ○ and ◎ both come back as a
+# capital O, often without the space before it. No name in the skill database
+# ends in a capital O, so a trailing one is always the symbol.
+SKILL_GRADE_SUFFIX = re.compile(r"(?:\s*[○◎]|\s?O)$")
+
+
+def compact_skill_key(text: str) -> str:
+    """Letters and digits only, grade dropped: 'After-SchoolStroll', 'After-School
+    Stroll' and 'After-School Stroll ○' are one key."""
+    stripped = SKILL_GRADE_SUFFIX.sub('', (text or '').strip())
+    return normalize_text_for_match(stripped).replace(' ', '')
+
+
 def get_canonical_skill_name(skill_name: str) -> str:
     names = load_skills_database()
     if not names:
         return ""
+    # OCR drops spaces. 'After-SchoolStroll' is no fuzzy match for anything, so
+    # on 14 Sep it was planned under that spelling, read correctly on the way
+    # back and never clicked. Without spaces or the grade it is an exact match.
+    compact_map = getattr(get_canonical_skill_name, 'cacheCompact', None)
+    if compact_map is None or getattr(get_canonical_skill_name, 'cacheCompactSource', None) is not names:
+        compact_map = {}
+        for original in names:
+            compact_map.setdefault(compact_skill_key(original), original)
+        setattr(get_canonical_skill_name, 'cacheCompact', compact_map)
+        setattr(get_canonical_skill_name, 'cacheCompactSource', names)
+    compact = compact_skill_key(skill_name)
+    if compact and compact in compact_map:
+        return compact_map[compact]
     query = normalize_text_for_match(skill_name)
     qlen = len(query)
     qbigrams = build_bigrams(query)
@@ -1055,14 +1081,25 @@ def find_skill(ctx, img, skill: list[str], learn_any_skill: bool) -> bool:
     log.debug(f"🔍 find_skill called with {len(skill)} skills: {skill}")
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     find = False
+    # Per-frame counts. On 14 Sep six chosen skills were never examined here,
+    # one of them sitting between two rows that were, and nothing said why: a
+    # row is dropped silently when it is out of reach or its crop matches the
+    # learned marker. These say which.
+    labels = in_reach = marked_learned = 0
     while True:
         match_result = image_match(img, REF_SKILL_LIST_DETECT_LABEL)
         if match_result.find_match:
+            labels += 1
             pos = match_result.matched_area
             pos_center = match_result.center_point
             if 460 < pos_center[0] < 560 and 450 < pos_center[1] < 1050:
+                in_reach += 1
                 skill_info_img = img[pos[0][1] - 65:pos[1][1] + 75, pos[0][0] - 470: pos[1][0] + 150]
-                if not image_match(skill_info_img, REF_SKILL_LEARNED).find_match:
+                learned_mark = image_match(skill_info_img, REF_SKILL_LEARNED).find_match
+                if learned_mark:
+                    marked_learned += 1
+                    log.info(f"Skill row at y={pos_center[1]} skipped: learned marker in its crop")
+                if not learned_mark:
                     skill_name_img = skill_info_img[10: 47, 100: 445]
                     detected_text = ocr_en(skill_name_img)
                     matched_skill = get_canonical_skill_name(detected_text)
@@ -1102,9 +1139,12 @@ def find_skill(ctx, img, skill: list[str], learn_any_skill: bool) -> bool:
                         log.debug(f"hint level error: {e}")
                     log.info(f"detected text='{detected_text}' matched skill='{matched_skill}'")
                     target_match = None
+                    # Compared without spaces or grade: OCR drops spaces, and a
+                    # skill planned as 'After-SchoolStroll' was read back as
+                    # 'After-School Stroll' and never clicked.
+                    row_keys = (compact_skill_key(name_for_match), compact_skill_key(detected_text))
                     for target in skill:
-                        if (normalize_text_for_match(name_for_match) == normalize_text_for_match(target)
-                            or normalize_text_for_match(detected_text) == normalize_text_for_match(target)):
+                        if compact_skill_key(target) and compact_skill_key(target) in row_keys:
                             target_match = target
                             break
                     
@@ -1152,4 +1192,6 @@ def find_skill(ctx, img, skill: list[str], learn_any_skill: bool) -> bool:
 
         else:
             break
+    log.info(f"Skill frame: {labels} rows, {in_reach} in reach, "
+             f"{marked_learned} skipped as learned")
     return find

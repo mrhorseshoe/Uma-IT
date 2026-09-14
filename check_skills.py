@@ -86,7 +86,7 @@ check("OCR of a symbol-suffixed name canonicalises",
 
 print("\nchoosing what to buy")
 tiers = [['a'], ['b']]
-chosen, _, spent = skills_mod._choose(
+chosen, _, spent, _ = skills_mod._choose(
     [skill('a', 100, 0), skill('b', 100, 1)], tiers, 300)
 check("buys across tiers when it can afford both", chosen == ['a', 'b'], str(chosen))
 check("  and adds up the cost", spent == 200, str(spent))
@@ -95,17 +95,17 @@ check("  and adds up the cost", spent == 200, str(spent))
 # must never stop the search. The parent breaks on both counts, and measured
 # against the built-in list a 300-point budget facing a 400-point skill bought
 # nothing at all - twice over, with affordable skills right there.
-chosen, _, spent = skills_mod._choose([skill('a', 400, 0), skill('b', 100, 1)], tiers, 300)
+chosen, _, spent, _ = skills_mod._choose([skill('a', 400, 0), skill('b', 100, 1)], tiers, 300)
 check("an unaffordable top tier does not stop the lower ones",
       chosen == ['b'] and spent == 100, f"{chosen} {spent}")
 
-chosen, _, spent = skills_mod._choose(
+chosen, _, spent, _ = skills_mod._choose(
     [skill('dear', 400, 0, hint=3), skill('cheap', 50, 0)], [['dear', 'cheap']], 300)
 check("an unaffordable skill does not stop the rest of its own tier",
       chosen == ['cheap'] and spent == 50, f"{chosen} {spent}")
 
 # The filler must only ever take budget the good skills declined.
-chosen, _, _ = skills_mod._choose(
+chosen, _, _, _ = skills_mod._choose(
     [skill('low', 100, 2), skill('top', 100, 0)], [['top'], [], ['low']], 500)
 check("priority order still decides who buys first", chosen == ['top', 'low'],
       str(chosen))
@@ -114,7 +114,7 @@ check("priority order still decides who buys first", chosen == ['top', 'low'],
 # that is what "no points left on the table" means, checkably.
 pool = [skill('A', 180, 0, hint=3), skill('B', 160, 0, hint=1), skill('C', 120, 1),
         skill('D', 90, 1), skill('E', 70, 2), skill('F', 45, 3), skill('G', 30, 3)]
-chosen, _, spent = skills_mod._choose(pool, [['A', 'B'], ['C', 'D'], ['E']], 500)
+chosen, _, spent, _ = skills_mod._choose(pool, [['A', 'B'], ['C', 'D'], ['E']], 500)
 unbought = [x['skill_cost'] for x in pool if x['skill_name'] not in chosen]
 check("nothing affordable is left unbought",
       not unbought or (500 - spent) < min(unbought),
@@ -123,27 +123,94 @@ check("nothing affordable is left unbought",
 # learn_skill_only_user_provided has to actually restrict. get_skill_list files
 # unnamed skills one tier past the end, and without this they were bought too.
 listed = [skill('named', 100, 0), skill('unnamed', 50, 1)]
-chosen, _, _ = skills_mod._choose(listed, [['named']], 500, only_listed=True)
+chosen, _, _, _ = skills_mod._choose(listed, [['named']], 500, only_listed=True)
 check("only-what-I-list leaves the unlisted bucket alone", chosen == ['named'],
       str(chosen))
 for x in listed:
     x['available'] = True
-chosen, _, _ = skills_mod._choose(listed, [['named']], 500, only_listed=False)
+chosen, _, _, _ = skills_mod._choose(listed, [['named']], 500, only_listed=False)
 check("  and without it the leftovers are spent on unlisted skills",
       chosen == ['named', 'unnamed'], str(chosen))
 
-chosen, _, _ = skills_mod._choose(
+chosen, _, _, _ = skills_mod._choose(
     [skill('x', 100, 0, hint=0), skill('y', 100, 0, hint=3)], [['x', 'y']], 100)
 check("prefers the higher hint level within a tier", chosen == ['y'], str(chosen))
 
-chosen, _, _ = skills_mod._choose(
+chosen, _, _, _ = skills_mod._choose(
     [skill('a', 100, 0, available=False), skill('b', 100, 0)], [['a', 'b']], 500)
 check("never buys an already-learned skill", chosen == ['b'], str(chosen))
 
 pool = [skill('gold', 100, 0, gold=True), skill('lesser', 100, 0)]
 pool[0]['subsequent_skill'] = 'lesser'
-chosen, _, _ = skills_mod._choose(pool, [['gold', 'lesser']], 500)
+chosen, _, _, _ = skills_mod._choose(pool, [['gold', 'lesser']], 500)
 check("a gold skill supersedes the one bound below it", chosen == ['gold'], str(chosen))
+
+# The owner's order, 14 Sep: priority skills, then the ◎ of priority skills
+# already bought at ○ (a higher grade sparks more often), then anything else.
+# A ◎ is only offered once its ○ is learned, so the pass that buys a priority
+# ○ has to hold points back.
+print("\nthree stages: priority, their ◎ upgrades, everything else")
+cb = skills_mod.circle_base
+check("a trailing O is read as a grade symbol",
+      (cb('Cloudy Days O'), cb('Right-HandedO'), cb('Muddy ◎'))
+      == ('cloudydays', 'righthanded', 'muddy'),
+      str((cb('Cloudy Days O'), cb('Right-HandedO'), cb('Muddy ◎'))))
+check("  and a plain name is not a circle skill", cb('Groundwork') is None)
+
+three = lambda: [skill('Groundwork', 100, 0), skill('Cloudy Days O', 60, 0),
+                 skill('Pressure', 50, 1)]
+PRIORITY = [['Groundwork', 'Cloudy Days O']]
+chosen, _, _, held = skills_mod._choose(three(), PRIORITY, 1000)
+check("a priority ○ holds back a ◎'s worth for the next pass", held == 75, str(held))
+chosen, _, _, _ = skills_mod._choose(three(), PRIORITY, 234)
+check("other skills cannot spend what is held for that ◎",
+      chosen == ['Groundwork', 'Cloudy Days O'], str(chosen))
+chosen, _, _, _ = skills_mod._choose(three(), PRIORITY, 285)
+check("  but take it once the hold is covered",
+      chosen == ['Groundwork', 'Cloudy Days O', 'Pressure'], str(chosen))
+
+chosen, _, _, held = skills_mod._choose(
+    [skill('Cloudy Days O', 60, 0), skill('Pressure', 50, 0)], [], 1000)
+check("an unlisted ○ is an ordinary skill: no hold, no place ahead",
+      chosen == ['Pressure', 'Cloudy Days O'] and held == 0, f"{chosen} {held}")
+
+chosen, _, _, held = skills_mod._choose(
+    [skill('Pressure', 50, 0), skill('Cloudy Days O', 60, 0)], [], 60,
+    circles_owned={'cloudydays'})
+check("a later pass buys the ◎ of a priority ○ before anything else",
+      chosen == ['Cloudy Days O'] and held == 0, f"{chosen} {held}")
+# Career 4, 14 Sep: both ◎ rows OCR'd with no symbol at all.
+chosen, _, _, _ = skills_mod._choose(
+    [skill('Pressure', 50, 0), skill('Wet Conditions ', 66, 0)], [], 66,
+    circles_owned={'wetconditions'})
+check("  even when OCR drops the ◎ entirely", chosen == ['Wet Conditions '], str(chosen))
+
+chosen, _, _, _ = skills_mod._choose(
+    [skill('dear', 300, 0, hint=3), skill('x', 100, 0), skill('y', 100, 0),
+     skill('z', 100, 0)], [], 300)
+check("everything else goes cheapest first, for the most skills",
+      sorted(chosen) == ['x', 'y', 'z'], str(chosen))
+chosen, _, _, held = skills_mod._choose(
+    [skill('named', 100, 0), skill('Cloudy Days O', 50, 1)], [['named']], 500,
+    only_listed=True)
+check("only-what-I-list skips the circle stage as well",
+      chosen == ['named'] and held == 0, f"{chosen} {held}")
+
+print("\nthe point total is read once the screen settles")
+reads = iter([0, 3734, 3734])
+skills_mod._read_skill_points = lambda _ctx: next(reads)
+got = skills_mod._settled_skill_points(FakeCtx())
+check("an early 0 is not believed", got == 3734, str(got))
+reads = iter([0] * 6)
+skills_mod._read_skill_points = lambda _ctx: next(reads)
+got = skills_mod._settled_skill_points(FakeCtx())
+check("  but a total that stays 0 is", got == 0, str(got))
+
+print("\nOCR that drops a space still names the skill")
+for text, want in (('After-SchoolStroll', 'After-School Stroll'),
+                   ('UmaStan', 'Uma Stan'), ('SpringRunner O', 'Spring Runner')):
+    got = get_canonical_skill_name(text)
+    check(f"{text!r} -> {want!r}", got == want, repr(got))
 
 print("\nthe task's saved preset is never edited")
 saved = [['Corner Acceleration'], ['Focus']]
@@ -162,6 +229,44 @@ check("  while the run's copy has it removed",
       str(ctx.career.remaining_skills))
 check("  and it confirms at the end",
       ctx.ctrl.clicks[-1] == NAME(CULTIVATE_LEARN_SKILL_CONFIRM), str(ctx.ctrl.clicks))
+
+print("\na pass remembers only what it actually clicked")
+cloudy = lambda _img, _w, _b: [dict(skill('Cloudy Days O', 60, 0),
+                                    skill_name_raw='Cloudy Days')]
+skills_mod.get_skill_list = cloudy
+ctx = FakeCtx(learn_skill_list=[['Cloudy Days']], skip_learn_skill=False)
+skills_mod.script_learn_skill(ctx)
+check("a clicked ○ is recorded, so the next pass knows its ◎",
+      ctx.career.circle_skills == {'cloudydays'}, str(ctx.career.circle_skills))
+check("  and it leaves the run's list", ctx.career.remaining_skills == [],
+      str(ctx.career.remaining_skills))
+
+skills_mod.get_skill_list = lambda _img, _w, _b: [dict(skill('Cloudy Days O', 60, 1),
+                                                       skill_name_raw='')]
+ctx = FakeCtx(learn_skill_list=[['Groundwork']], skip_learn_skill=False)
+skills_mod.script_learn_skill(ctx)
+check("an unlisted ○ that gets bought is not lined up for a ◎",
+      not ctx.career.circle_skills, str(ctx.career.circle_skills))
+skills_mod.get_skill_list = cloudy
+
+sweeps = []
+skills_mod.find_skill = lambda _ctx, _img, to_click, **kw: (sweeps.append(1), False)[1]
+ctx = FakeCtx(learn_skill_list=[['Cloudy Days']], skip_learn_skill=False)
+skills_mod.script_learn_skill(ctx)
+check("a chosen skill not found gets a second sweep", len(sweeps) == 2, str(len(sweeps)))
+check("  and, never clicked, keeps its priority tier",
+      ctx.career.remaining_skills == [['Cloudy Days']], str(ctx.career.remaining_skills))
+check("  and is not recorded as owned", not ctx.career.circle_skills,
+      str(ctx.career.circle_skills))
+skills_mod.find_skill = lambda _ctx, _img, to_click, **kw: (to_click.clear() or True)
+
+seen = {}
+ctx = FakeCtx(learn_skill_list=[['Cloudy Days']], skip_learn_skill=False)
+ctx.career.remaining_skills = []
+skills_mod.get_skill_list = lambda _img, wanted, _b: (seen.__setitem__('wanted', wanted), [])[1]
+skills_mod.script_learn_skill(ctx)
+check("once the task's own list is bought, the shipped tiers do not take over",
+      seen.get('wanted') == [], str(seen.get('wanted')))
 
 # The click that actually spends the points, and the screen it belongs to.
 # CONFIRMATION_LEARNSKILL_BUTTON is a crop of this dialog's Learn button, so it

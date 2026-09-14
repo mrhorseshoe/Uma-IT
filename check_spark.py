@@ -178,8 +178,11 @@ check("  and says so in the result",
 print("\nneither set qualifies: the bigger set wins")
 
 
-def choose(rerolled, original, ratio_rerolled, ratio_original):
-    """Drive handle_spark_selection over a scripted carousel."""
+def choose(rerolled, original, ratio_rerolled, ratio_original, roll1=None):
+    """Drive handle_spark_selection over a scripted carousel.
+
+    `roll1` is roll 1 as the reroll screen read it, past the fold if need be.
+    """
     state = {'view': 'rerolled'}
     rows = {'rerolled': rerolled, 'original': original}
     ratios = {'rerolled': ratio_rerolled, 'original': ratio_original}
@@ -194,7 +197,8 @@ def choose(rerolled, original, ratio_rerolled, ratio_original):
     spark.parse_spark_rows = lambda ctx, **kw: rows[state['view']]
     spark.spark_scrollbar_ratio = lambda img: ratios[state['view']]
 
-    ctx = FakeCtx(career_state={'spark_reroll_phase': 'reroll_clicked'},
+    ctx = FakeCtx(career_state={'spark_reroll_phase': 'reroll_clicked',
+                                'spark_roll1_rows': roll1 or []},
                   spark_reroll_enabled=True,
                   spark_reroll_targets={'nothing-matches-this': 3})
     spark.handle_spark_selection(ctx)
@@ -230,6 +234,20 @@ check("a shorter thumb still wins when the lists overflow",
 res = choose(nine, list(nine), 1.0, 0.70)
 check("  and a full page loses to one with rows below the fold",
       res['chosen'] == 'original', f"{res['chosen']} - {res['reason']}")
+
+# Career 2, 14 Sep: both sets 13 sparks, so the thumbs tied and it came down to
+# stars - but the rerolled set had been read past the fold and the original
+# only to it, 21 stars against 9 rows' 13. Here the fair count (18 vs 16)
+# favours the original and the unfair one (16 vs 10) the rerolled set.
+full_rerolled = [row(f'n{i}', 1) for i in range(10)] + [row('x', 2), row('y', 2), row('z', 2)]
+original_full = [row(f'o{i}', 1) for i in range(8)] + [row(f'p{i}', 2) for i in range(5)]
+original_visible = original_full[:9]
+res = choose(full_rerolled, original_visible, 0.66, 0.66, roll1=original_full)
+check("a star tie-break counts the original set in full, as it counts the rerolled one",
+      res['chosen'] == 'original' and '16 vs 18' in res['reason'],
+      f"{res['chosen']} - {res['reason']}")
+check("  and records the full original set",
+      len(res['original']) == 13, str(len(res['original'])))
 
 print(f"\n{len(failures)} failed")
 sys.exit(1 if failures else 0)

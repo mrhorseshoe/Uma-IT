@@ -36,7 +36,7 @@ from uma_it.asset.point import (
     CULTIVATE_LEARN_SKILL_CONFIRM_AGAIN,
 )
 from uma_it.const import SKILL_LEARN_PRIORITY_LIST
-from uma_it.parse import find_skill, get_skill_list
+from uma_it.parse import SKILL_GRADE_SUFFIX, find_skill, get_skill_list
 
 log = logger.get_logger(__name__)
 
@@ -99,58 +99,153 @@ def _read_skill_points(ctx) -> int:
     return int(digits) if digits else 0
 
 
-def _choose(skills, wanted, budget, only_listed=False):
-    """Pick what to buy: priority order first, then spend what is left over.
+def _settled_skill_points(ctx, tries: int = 6) -> int:
+    """The skill point total, read once the screen has stopped moving.
 
-    Every tier is considered, and within a tier an unaffordable skill is
-    skipped rather than ending the tier. That is the difference between this
-    and the parent, which breaks on both counts - so one expensive skill early
-    in a tier stopped the whole tier, and one unaffordable tier stopped every
-    tier below it. Measured: a 300-point budget facing a 400-point skill bought
-    nothing at all, twice over, with affordable skills sitting right there.
+    Read straight after the screen opens, the total can come back 0. On 14 Sep
+    a second pass logged '0 skill points, 6 skills on the screen' with about
+    800 points left, decided nothing was affordable and finished the career -
+    and the second pass is the one that picks up what the first missed, and
+    the only one that can buy a ◎. That frame's list read was short as well,
+    so the whole screen had not settled, which is why this runs before the
+    list is read rather than after.
 
-    Nothing is being saved for later. This runs at the end of a career, so a
-    point not spent here is lost.
-
-    Order still matters: tiers are visited in order and, within a tier, highest
-    hint level first, so cheap filler can only take budget the good skills had
-    already declined.
-
-    `only_listed` stops at the last tier the user named, leaving the
-    everything-else bucket unbought - which is what
-    `learn_skill_only_user_provided` asks for.
+    Two equal non-zero reads a second apart are believed. A total that never
+    rises above 0 in `tries` reads is believed as well.
     """
-    chosen, chosen_raw, spent = [], [], 0
-    # get_skill_list files anything the user did not name one past the last
-    # tier, so that bucket is the natural last stop.
-    levels = len(wanted) if only_listed else len(wanted) + 1
-    for level in range(levels):
-        at_level = sorted(
-            [s for s in skills if s["priority"] == level and s["available"] is True],
-            key=lambda s: -int(s.get("hint_level", 0)))
-        for skill in at_level:
-            # Re-checked inside the loop, not just when at_level was built: a
-            # gold skill bought earlier in this same tier marks the skill below
-            # it unavailable, and the parent misses that because it filters
-            # once up front.
-            if skill["available"] is not True:
-                continue
-            if spent + skill["skill_cost"] > budget:
-                log.debug(f"Skipping {skill['skill_name']!r} - costs "
-                          f"{skill['skill_cost']}, {budget - spent} left")
-                continue
-            spent += skill["skill_cost"]
-            chosen.append(skill["skill_name"])
-            chosen_raw.append(skill["skill_name_raw"])
-            log.info(f"Buying {skill['skill_name']!r} "
-                     f"(cost {skill['skill_cost']}, spent {spent}/{budget})")
-            # A gold skill supersedes the skill bound below it; that one can no
-            # longer be bought separately.
-            if skill["gold"] is True and skill.get("subsequent_skill"):
-                for other in skills:
-                    if other["skill_name"] == skill["subsequent_skill"]:
-                        other["available"] = False
-    return chosen, chosen_raw, spent
+    last, seen = None, 0
+    for _ in range(tries):
+        points = _read_skill_points(ctx)
+        if points and points == last:
+            return points
+        if points:
+            seen = points
+        last = points
+        time.sleep(1)
+    if seen:
+        log.warning(f"Skill points never read the same twice - using {seen}")
+    return seen
+
+
+def _scroll_to_bottom(ctx, limit: int = 20):
+    for _ in range(limit):
+        rgb = cv2.cvtColor(ctx.ctrl.get_screen(), cv2.COLOR_BGR2RGB)
+        if not compare_color_equal(rgb[MORE_BELOW_PIXEL], SCROLLBAR_COLOR):
+            return
+        ctx.ctrl.swipe(x1=23, y1=1000, x2=23, y2=636, duration=1000,
+                       name="scroll the skill list")
+        time.sleep(1)
+
+
+def _drop_from_remaining(career, remaining, names):
+    for tier in remaining:
+        for name in list(tier):
+            if name in names:
+                tier.remove(name)
+    career.remaining_skills = [tier for tier in remaining if tier]
+
+
+# A ◎ is offered only once its ○ is learned, and costs about the same: across
+# 11-12 Sep the ◎ came in at 1.0x to 1.22x its ○. Holding back 5/4 errs towards
+# leaving points for the next pass, which spends them anyway.
+UPGRADE_HOLD_BACK = (5, 4)
+
+
+def circle_base(name):
+    """A circle skill's name without its grade, as letters only; else None.
+
+    OCR reads both ○ and ◎ as a capital O, so the name never says which grade
+    a row is - `_choose` settles that from what this career has learned.
+    """
+    text = (name or '').strip()
+    if not SKILL_GRADE_SUFFIX.search(text):
+        return None
+    return name_key(text) or None
+
+
+def name_key(name):
+    """A skill name as letters only, any grade symbol dropped."""
+    text = SKILL_GRADE_SUFFIX.sub('', (name or '').strip())
+    return re.sub(r'[^a-z]', '', text.lower())
+
+
+def _choose(skills, wanted, budget, only_listed=False, circles_owned=frozenset()):
+    """Pick what to buy, and what to hold back for the next pass.
+
+    Three stages, each spending only what the ones before it left:
+
+    1. **The priority tiers**, in order, highest hint level first in a tier.
+    2. **◎ upgrades of priority skills** - a higher grade sparks more often,
+       and sparks are what a parent is for. Only for circle skills bought as
+       priority skills earlier in this career (the owner's rule, 14 Sep); an
+       unlisted ○ gets no special treatment. A ◎ is only offered once its ○
+       is learned, so it can never be bought in the pass that buys the ○.
+       Each priority ○ bought here therefore holds back an estimate of its ◎
+       from stage 3, and the next pass - which always follows a pass that
+       bought something - finds the ◎ and buys it first. OCR cannot tell ○
+       from ◎, so a circle row counts as that upgrade when its ○ is in
+       `circles_owned`.
+    3. **Everything else, cheapest first.** Each skill learned is another
+       chance at a white spark, so the most skills for the points is the best
+       use of what is left.
+
+    An unaffordable skill is skipped, never a reason to stop. The parent
+    breaks there, and a 300-point budget facing a 400-point skill bought
+    nothing at all, twice over.
+
+    `only_listed` stops after stage 1, which is what
+    `learn_skill_only_user_provided` asks for.
+
+    Returns (chosen, chosen_raw, spent, held_back).
+    """
+    chosen, chosen_raw = [], []
+    tally = {'spent': 0, 'held': 0}
+
+    def buy(skill, stage, limit):
+        # Re-checked per skill: a gold skill bought earlier in this same call
+        # marks the skill bound below it unavailable.
+        if skill["available"] is not True or skill["skill_name"] in chosen:
+            return
+        if tally['spent'] + skill["skill_cost"] > limit:
+            log.debug(f"Skipping {skill['skill_name']!r} - costs "
+                      f"{skill['skill_cost']}, {limit - tally['spent']} to spend")
+            return
+        tally['spent'] += skill["skill_cost"]
+        chosen.append(skill["skill_name"])
+        chosen_raw.append(skill["skill_name_raw"])
+        log.info(f"Buying {skill['skill_name']!r} ({stage}, cost "
+                 f"{skill['skill_cost']}, spent {tally['spent']}/{budget})")
+        # A gold skill supersedes the skill bound below it.
+        if skill["gold"] is True and skill.get("subsequent_skill"):
+            for other in skills:
+                if other["skill_name"] == skill["subsequent_skill"]:
+                    other["available"] = False
+        base = circle_base(skill["skill_name"])
+        if stage == "priority" and base and base not in circles_owned and not only_listed:
+            num, den = UPGRADE_HOLD_BACK
+            tally['held'] += -(-skill["skill_cost"] * num // den)
+
+    for level in range(len(wanted)):
+        for skill in sorted([s for s in skills if s["priority"] == level],
+                            key=lambda s: -int(s.get("hint_level", 0))):
+            buy(skill, "priority", budget)
+    if only_listed:
+        return chosen, chosen_raw, tally['spent'], 0
+
+    # get_skill_list files anything the user did not name one past the last tier.
+    unlisted = [s for s in skills if s["priority"] == len(wanted)]
+    # Matched on the name alone, symbol or not: on 14 Sep both ◎ rows OCR'd
+    # with no symbol at all ('Wet Conditions '), so `circle_base` saw plain
+    # names and they were bought as 'other'. Only circle skills are ever in
+    # `circles_owned`, so a plain skill cannot match by accident.
+    upgrades = sorted([s for s in unlisted if name_key(s["skill_name"]) in circles_owned],
+                      key=lambda s: s["skill_cost"])
+    for skill in upgrades:
+        buy(skill, "◎ upgrade", budget)
+    for skill in sorted(unlisted, key=lambda s: (s["skill_cost"],
+                                                 -int(s.get("hint_level", 0)))):
+        buy(skill, "other", budget - tally['held'])
+    return chosen, chosen_raw, tally['spent'], tally['held']
 
 
 def script_learn_skill(ctx):
@@ -164,20 +259,30 @@ def script_learn_skill(ctx):
 
     remaining = career.skills_wanted(detail)
     blacklist = list(getattr(detail, 'learn_skill_blacklist', None) or [])
+    only_listed = bool(getattr(detail, 'learn_skill_only_user_provided', False))
 
-    if getattr(detail, 'learn_skill_only_user_provided', False):
+    if only_listed:
         if not remaining:
             _leave(ctx, "No skills left in the task's list - returning")
             return
         wanted = remaining
+    elif any(getattr(detail, 'learn_skill_list', None) or []):
+        # The task names skills, so its list stands even once this run has
+        # bought all of them. This used to fall back on the run copy being
+        # empty, which swapped the shipped tiers in on a later pass - ahead of
+        # the ◎ upgrades that pass is there to buy.
+        wanted = remaining
     else:
-        wanted = remaining or SKILL_LEARN_PRIORITY_LIST
+        wanted = SKILL_LEARN_PRIORITY_LIST
 
-    log.info("Skill priorities: " + " | ".join(
-        f"{i}: {', '.join(tier)}" for i, tier in enumerate(wanted) if tier))
+    listed = {name for tier in wanted for name in tier}
+    log.info("Skill priorities: " + (" | ".join(
+        f"{i}: {', '.join(tier)}" for i, tier in enumerate(wanted) if tier)
+        or "all bought"))
     if blacklist:
         log.info("Blacklist: " + ", ".join(blacklist))
 
+    budget = _settled_skill_points(ctx)
     skills = _read_every_page(ctx, wanted, blacklist)
     already = [s.get('skill_name_raw') or s.get('skill_name')
                for s in skills if s.get('available') is False]
@@ -190,18 +295,21 @@ def script_learn_skill(ctx):
             skill["subsequent_skill"] = skills[i + 1]["skill_name"]
 
     skills.sort(key=lambda s: s["priority"])
-    budget = _read_skill_points(ctx)
     log.info(f"{budget} skill points, {len(skills)} skills on the screen")
 
-    only_listed = bool(getattr(detail, 'learn_skill_only_user_provided', False))
-    chosen, chosen_raw, spent = _choose(skills, wanted, budget, only_listed)
+    chosen, chosen_raw, spent, held = _choose(
+        skills, wanted, budget, only_listed,
+        circles_owned=frozenset(career.circle_skills))
     log.info(f"Buying {len(chosen)} skill(s) for {spent} points: "
              f"{', '.join(chosen) if chosen else 'none'}")
+    if held:
+        log.info(f"Holding back {held} points for the ◎ upgrades the next pass "
+                 f"will offer")
 
     # Say what is left, and whether anything could still have been bought with
     # it. "Do not leave points on the table" is only checkable if the log says
     # how many were left over.
-    left = budget - spent
+    left = budget - spent - held
     affordable = [x for x in skills
                   if x["available"] is True and x["skill_name"] not in chosen
                   and x["skill_cost"] <= left
@@ -217,33 +325,50 @@ def script_learn_skill(ctx):
     ctx.ctrl.swipe(x1=23, y1=950, x2=23, y2=968, duration=100, name="align the skill list")
     time.sleep(1)
 
-    # Drop what is now learned - or was already - from this run's list, so a
-    # second pass does not go looking for them again.
-    learned = set(chosen_raw) | {s['skill_name_raw'] for s in skills
-                                 if s['available'] is False}
-    for tier in remaining:
-        for name in list(tier):
-            if name in learned:
-                tier.remove(name)
-    career.remaining_skills = [tier for tier in remaining if tier]
+    # What was already learned leaves this run's list now. What is being bought
+    # leaves only once it is clicked - dropping it at planning time meant a
+    # missed click took the skill out of its priority tier for later passes.
+    _drop_from_remaining(career, remaining,
+                         {s['skill_name_raw'] for s in skills if s['available'] is False})
 
     if not chosen:
         _leave(ctx, "Nothing affordable to buy - returning")
         return
 
     to_click = list(chosen)
-    while True:
-        img = ctx.ctrl.get_screen()
-        if find_skill(ctx, img, to_click, learn_any_skill=False):
-            career.learn_skill_selected = True
+    for sweep in range(2):
+        if sweep:
+            log.warning(f"{len(to_click)} chosen skill(s) not found on the way up - "
+                        f"sweeping the list again: {', '.join(to_click)}")
+            _scroll_to_bottom(ctx)
+        while True:
+            img = ctx.ctrl.get_screen()
+            if find_skill(ctx, img, to_click, learn_any_skill=False):
+                career.learn_skill_selected = True
+            if not to_click:
+                break
+            rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            if not compare_color_equal(rgb[MORE_ABOVE_PIXEL], SCROLLBAR_COLOR):
+                break
+            ctx.ctrl.swipe(x1=23, y1=636, x2=23, y2=1000, duration=1000,
+                           name="scroll the skill list back")
+            time.sleep(1)
         if not to_click:
             break
-        rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        if not compare_color_equal(rgb[MORE_ABOVE_PIXEL], SCROLLBAR_COLOR):
-            break
-        ctx.ctrl.swipe(x1=23, y1=636, x2=23, y2=1000, duration=1000,
-                       name="scroll the skill list back")
-        time.sleep(1)
+
+    clicked = [(name, raw) for name, raw in zip(chosen, chosen_raw)
+               if name not in to_click]
+    if to_click:
+        log.warning(f"Could not find {len(to_click)} chosen skill(s): "
+                    f"{', '.join(to_click)} - the next pass looks again")
+    # Recorded only for priority skills: those are the ones whose ◎ the next
+    # pass buys ahead of everything else. `listed` was taken before either
+    # drop above, which edits these same tier lists in place.
+    for name, raw in clicked:
+        base = circle_base(name)
+        if base and raw in listed:
+            career.circle_skills.add(base)
+    _drop_from_remaining(career, remaining, {raw for _, raw in clicked})
 
     career.learn_skill_done = True
     log.info("Skill buying done - confirming")
