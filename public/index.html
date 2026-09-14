@@ -740,18 +740,29 @@ function getReqs() {
    a set of boxes, and "needs every row" is exactly the kind of thing people
    read the other way round. */
 function showReadback() {
-  const parts = [];
+  /* Written the way the bot decides (`spark_rule_check`): a roll has one blue
+     and one pink spark, so any blue target satisfies the blue group and any
+     pink the pink group. Both needs a hit in each group, Either a hit in
+     either; each white row is one more any-of, and every clause must hold.
+     This used to join every colour target with the Either/Both word, so
+     Both read "Power and Stamina and Long and Turf" - a roll that cannot
+     exist, and not what the bot checks. */
+  const clauses = [];
   const colour = sparkTargets || {};
-  if (Object.keys(colour).length) {
-    const names = Object.keys(colour).map((n) => `${n} ${colour[n]}★`);
-    const joiner = sparkMode === "and" ? " and " : " or ";
-    parts.push(names.join(joiner));
+  const star = (name, stars) => `${name} ${stars}★`;
+  const isBlue = (n) => SPARK_BLUE.some((b) => b.toLowerCase() === String(n).toLowerCase());
+  const names = Object.keys(colour);
+  const blue = names.filter(isBlue).map((n) => star(n, colour[n]));
+  const pink = names.filter((n) => !isBlue(n)).map((n) => star(n, colour[n]));
+  if (sparkMode === "and" && blue.length && pink.length) {
+    clauses.push(blue, pink);
+  } else if (blue.length || pink.length) {
+    clauses.push(blue.concat(pink));
   }
-  getReqs().forEach((row) => {
-    parts.push(row.map((e) => `${e.name} ${e.stars}★`).join(" or "));
-  });
-  $("rule-readback").textContent = parts.length
-    ? parts.join(", and ")
+  getReqs().forEach((row) => clauses.push(row.map((e) => star(e.name, e.stars))));
+  $("rule-readback").textContent = clauses.length
+    ? clauses.map((c) => (clauses.length > 1 && c.length > 1 ? `(${c.join(" or ")})` : c.join(" or ")))
+        .join(" and ")
     : "nothing targeted yet";
 }
 
