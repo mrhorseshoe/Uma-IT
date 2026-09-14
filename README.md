@@ -20,10 +20,20 @@ by name → load your saved agenda → wait out the ~50 minute run → collect �
 repeat. The process restarts itself after every career, so loop counts,
 scheduler state and the task survive in `userdata/`.
 
-**Buys skills, and does not leave points behind.** Sweeps the skill screen
-repeatedly, because learning one unlocks others, until nothing affordable is
-left. Typical result: 4,100 points down to single digits. Priorities are yours
-in three tiers, with a blacklist, saved as named presets.
+**Buys skills, and does not leave points behind.** Spends in three stages:
+
+1. **your priority skills**, in the order you list them;
+2. **the ◎ upgrade of any priority skill it bought at ○** — a higher grade
+   sparks more often. The game only offers a ◎ once its ○ is learned, so the
+   bot holds points back for it and buys it on the next pass;
+3. **everything else, cheapest first**, since every skill learned is another
+   chance at a white spark.
+
+It sweeps the skill screen repeatedly — learning one skill unlocks others, and
+a row missed on one sweep is caught on the next — until nothing affordable is
+left. Typical result: 3,700 points down to less than the cheapest skill still
+on offer. Priorities are yours in three tiers, with a blacklist, saved as named
+presets; **Only buy what I list** stops after stage 1.
 
 **Rerolls sparks against a rule you write.** Targets can be:
 
