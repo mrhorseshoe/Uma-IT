@@ -105,6 +105,11 @@ class TaskDetail:
     # of skills co-occurs in about 2-4% of them while "any of five" lands near
     # 56%, so the arrangement people need most often is the cheap one here.
     spark_skill_targets: list
+    # Runs whose kept sparks met every requirement, since the loop was last
+    # started fresh (Run again clears it with loops_done). Durable for the same
+    # reason loops_done is; counted at the spark decision, in `uma_it/spark.py`,
+    # because that is where the result is known.
+    spark_goal_runs: int
     # No `spark_reroll_use_carats`. In the parent that flag authorises a
     # 66-line flow that drives the in-game shop to buy TP with carats, and it
     # is not ported: carats are real currency, `allow_recover_tp` already
@@ -270,6 +275,7 @@ def build_task(task_execute_mode: TaskExecuteMode, task_type: int,
     td.spark_reroll_mode = 'and' if data.get('spark_reroll_mode') == 'and' else 'or'
     td.stop_at_spark_reroll = bool(data.get('stop_at_spark_reroll', False))
     td.spark_skill_targets = _skill_requirement_rows(data.get('spark_skill_targets'))
+    td.spark_goal_runs = _int(data.get('spark_goal_runs'), 0, 0)
 
     task = UmaItTask(app_name=APP_NAME,
                      task_execute_mode=task_execute_mode,

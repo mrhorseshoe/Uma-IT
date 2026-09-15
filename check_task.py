@@ -177,6 +177,17 @@ t9 = build_task(LOOP, 1, "sparks", None, REAL)
 check("a task saved before the field existed restores with no requirement",
       t9.detail.spark_skill_targets == [], str(t9.detail.spark_skill_targets))
 
+# Runs whose kept sparks met every requirement, shown on the dashboard. Bumped
+# at the spark decision and written by the same end-of-run save as loops_done.
+print("\nthe spark goal counter")
+t10 = build_task(LOOP, 1, "sparks", None, REAL)
+check("a task saved before the counter existed starts it at 0",
+      t10.detail.spark_goal_runs == 0, str(t10.detail.spark_goal_runs))
+t10.detail.spark_goal_runs = 3
+t11 = build_task(LOOP, 1, "sparks", None, serialize_umamusume_task(t10) or {})
+check("  and a count survives the restart", t11.detail.spark_goal_runs == 3,
+      str(t11.detail.spark_goal_runs))
+
 # The scheduler reads these two off the detail by name to decide when a loop is
 # done. A rename here would silently make every loop unlimited.
 print("\nfields the scheduler reads by name")

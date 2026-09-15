@@ -107,6 +107,18 @@ def _decide(ctx, rows, targets, mode, min_stars, requirements):
     return full, spark_rule_check(full, targets, mode, min_stars, requirements)
 
 
+def _count_goal_met(ctx):
+    """One more run whose kept sparks met every requirement.
+
+    Called from the two places a qualifying set is kept - roll 1, or the
+    rerolled set - each of which runs once per career. It lands on the task, so
+    the end-of-run save that writes loops_done writes this too.
+    """
+    detail = ctx.task.detail
+    detail.spark_goal_runs = (getattr(detail, 'spark_goal_runs', 0) or 0) + 1
+    log.info(f"🎲 Spark requirements met - {detail.spark_goal_runs} run(s) this session")
+
+
 def _spark_rows_text(rows) -> str:
     return ", ".join(f"{r['color'] or '?'}:{r['name'] or '?'}({r['canonical'] or '-'}) {r['stars']}*"
                      for r in rows) or "(none)"
@@ -225,6 +237,7 @@ def script_factor_reroll(ctx):
         d.spark_roll1_rows = rows
         if hit:
             log.info(f"🎲 Desired spark(s) '{hit}' present at the required stars - keeping this roll")
+            _count_goal_met(ctx)
             d.spark_reroll_phase = 'keep'
             d.spark_reroll_result = {'rerolled': False, 'chosen': 'original',
                                      'reason': f"roll 1 has {hit}"}
@@ -300,6 +313,7 @@ def handle_spark_selection(ctx):
         if hit:
             choose_rerolled = True
             reason = f"rerolled set has {hit}"
+            _count_goal_met(ctx)
             original_rows = []
         else:
             # Neither set qualifies. Prefer the set with more white sparks. A

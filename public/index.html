@@ -218,6 +218,7 @@ pre#log {
   <div class="metrics">
     <div class="metric"><div class="k">Time left</div><div class="v" id="remaining">—</div></div>
     <div class="metric"><div class="k">Runs done</div><div class="v" id="runs">—</div></div>
+    <div class="metric"><div class="k">Sparks met</div><div class="v" id="sparkmet">—</div></div>
     <div class="metric"><div class="k">Limit</div><div class="v" id="limit">—</div></div>
   </div>
   <div class="controls">
@@ -951,6 +952,10 @@ function render(status, state) {
 
   $("remaining").textContent = it.remaining || "—";
   $("runs").textContent = d ? (d.loops_done ?? 0) : "—";
+  // Runs whose kept sparks met every requirement, out of the runs done.
+  $("sparkmet").textContent = !d ? "—"
+    : !d.spark_reroll_enabled ? "off"
+    : `${d.spark_goal_runs ?? 0} of ${d.loops_done ?? 0}`;
   $("limit").textContent = d ? (d.loop_count ? d.loop_count : "∞") : "—";
 
   // Start does nothing once the limit is reached: the scheduler leaves a task
@@ -1080,9 +1085,10 @@ async function runAgain() {
   try {
     /* consecutive_failures too: three in a row stop the loop, and a user
        pressing Run again means "start fresh", not "start one failure from
-       stopping again". */
+       stopping again". The spark goal count too: it counts this session. */
     await writeTask(Object.assign({}, task.detail,
-                                  { loops_done: 0, consecutive_failures: 0 }));
+                                  { loops_done: 0, consecutive_failures: 0,
+                                    spark_goal_runs: 0 }));
     await refresh();
     const res = await api("/action/bot/start", { method: "POST" });
     if (!res.ok) throw new Error("HTTP " + res.status);
@@ -1103,6 +1109,7 @@ async function saveTask(ev) {
     loop_count: Number($("loops").value) || 0,
     // Carried forward so editing a task does not reset the run count.
     loops_done: (task && task.detail && task.detail.loops_done) || 0,
+    spark_goal_runs: (task && task.detail && task.detail.spark_goal_runs) || 0,
     use_last_parents: $("parents").checked,
     skip_learn_skill: $("skills").checked,
     learn_skill_list: [0, 1, 2].map((i) => tagBoxes["tier" + i].get()),

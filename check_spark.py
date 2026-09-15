@@ -119,6 +119,8 @@ check("it confirms without rerolling",
       ctx.ctrl.clicks == [NAME(CULTIVATE_FACTOR_REROLL_SKIP)], str(ctx.ctrl.clicks))
 check("  and records why", ctx.career.spark_reroll_result.get('rerolled') is False,
       str(ctx.career.spark_reroll_result))
+check("  and counts it as a run that met the requirements",
+      ctx.task.detail.spark_goal_runs == 1, str(ctx.task.detail.spark_goal_runs))
 
 print("\nan unreadable roll is kept rather than gambled on")
 spark.parse_spark_rows = lambda _ctx: []
@@ -178,7 +180,8 @@ check("  and says so in the result",
 print("\nneither set qualifies: the bigger set wins")
 
 
-def choose(rerolled, original, ratio_rerolled, ratio_original, roll1=None):
+def choose(rerolled, original, ratio_rerolled, ratio_original, roll1=None,
+           targets=None):
     """Drive handle_spark_selection over a scripted carousel.
 
     `roll1` is roll 1 as the reroll screen read it, past the fold if need be.
@@ -200,9 +203,10 @@ def choose(rerolled, original, ratio_rerolled, ratio_original, roll1=None):
     ctx = FakeCtx(career_state={'spark_reroll_phase': 'reroll_clicked',
                                 'spark_roll1_rows': roll1 or []},
                   spark_reroll_enabled=True,
-                  spark_reroll_targets={'nothing-matches-this': 3})
+                  spark_reroll_targets=targets or {'nothing-matches-this': 3})
     spark.handle_spark_selection(ctx)
-    return ctx.career.spark_reroll_result
+    return dict(ctx.career.spark_reroll_result,
+                goal_runs=ctx.task.detail.spark_goal_runs)
 
 
 big = [row('speed', 1), row('mile', 1)] + [row(f'race{i}', 1) for i in range(6)]
@@ -248,6 +252,15 @@ check("a star tie-break counts the original set in full, as it counts the reroll
       f"{res['chosen']} - {res['reason']}")
 check("  and records the full original set",
       len(res['original']) == 13, str(len(res['original'])))
+
+print("\ncounting runs whose kept sparks met every requirement")
+res = choose(big, small_but_starry, 1.0, 1.0)
+check("a run where neither set qualifies is not counted", res['goal_runs'] == 0,
+      str(res['goal_runs']))
+res = choose([row('Speed', 3)], small_but_starry, 1.0, 1.0, targets={'speed': 3})
+check("a rerolled set that qualifies is counted, once",
+      res['chosen'] == 'rerolled' and res['goal_runs'] == 1,
+      f"{res['chosen']} {res['goal_runs']}")
 
 print(f"\n{len(failures)} failed")
 sys.exit(1 if failures else 0)
