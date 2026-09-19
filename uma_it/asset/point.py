@@ -56,6 +56,30 @@ SCENARIO_RATING_UPDATE_CONFIRM = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COOR
 STORY_REWARDS_COLLECTED_CLOSE = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(360, 1180), "Story Rewards Collected - Close", None)
 ESCAPE = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(5, 715), "escape", None)
 
+# Team trials - the path from Home to a finished race, moved verbatim from the
+# parent project's rule table. See uma_it/team_trials.py.
+TT_RACE_TAB = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(522, 1228), "Team trials - Race tab", None)
+TT_TEAM_TRIALS = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(106, 812), "Team trials - open Team Trials", None)
+TT_TEAM_RACE = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(351, 839), "Team trials - Team Race", None)
+TT_SELECT_OPPONENT = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(73, 278), "Team trials - first opponent", None)
+TT_SEE_ALL = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(359, 1200), "Team trials - See All Results", None)
+TT_NEXT_AFTER = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(508, 896), "Team trials - confirm after Next", None)
+TT_SEE_RESULTS = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(514, 1208), "Team trials - See Results", None)
+TT_NEXT_RESULT = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(393, 1183), "Team trials - Next result", None)
+TT_DONE = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(355, 1200), "Team trials - leave", None)
+TT_ITEMS_SELECTED_OK = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(610, 908), "Team trials - Items Selected OK", None)
+# The game's own Back button, bottom left of the career-start screens. A
+# session begins wherever the declined TP prompt left the bot, which is not
+# Home, and every rule below starts from Home.
+TT_BACK = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(74, 1078), "Team trials - Back", None)
+# The countdown screen has no Back: its only way out is the menu button, and
+# then "To Home" - which is matched, never clicked blind, because "Give Up"
+# sits beside it and would throw the career away.
+IT_MENU = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(644, 1231), "Independent Training - menu", None)
+# "Not enough RP. Do you want to restore RP?" - the real end of a session on
+# this version of the game. No, every time: RP is not worth carats.
+RP_RESTORE_NO = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(202, 834), "Not enough RP - decline", None)
+
 # --- dialogs that only script_info handled in the parent ------------------
 # Not reachable from any screen definition, which is why they arrive after the
 # 38 above. Both are copied verbatim; see uma_it/dialogs.py for what fires them.

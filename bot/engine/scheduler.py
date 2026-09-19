@@ -119,7 +119,12 @@ class Scheduler:
                         # pay for, so the loop waits for it to regenerate
                         # rather than failing three careers in half a minute.
                         resume_after = getattr(detail, 'resume_after', 0) or 0
-                        if resume_after and time.time() < resume_after:
+                        # ... unless the app has something to do inside the
+                        # wait. uma-it spends RP on team trials there, which
+                        # regenerates separately and would otherwise sit
+                        # capped; the wait still stands once that is done.
+                        if (resume_after and time.time() < resume_after
+                                and not getattr(detail, 'tt_pending', False)):
                             continue
                         if task.task_status in [TaskStatus.TASK_STATUS_SUCCESS, TaskStatus.TASK_STATUS_FAILED]:
                             if not limit_reached:

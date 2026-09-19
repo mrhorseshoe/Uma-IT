@@ -78,6 +78,16 @@ class TaskDetail:
     # spent waiting since the last career completed; see MAX_TP_WAIT_SECONDS.
     resume_after: int
     tp_waited_seconds: int
+    # Team trials spend RP, which nothing else here uses and which stops
+    # accruing once it caps at 5. Run only inside a TP wait, so they never
+    # delay a career. `tt_pending` says a session is owed and is durable: the
+    # scheduler starts the task for it even though the TP wait still stands.
+    team_trials_while_waiting: bool
+    tt_pending: bool
+    # When RP last ran out. Durable, because the loop restarts between careers
+    # and RP takes 90 minutes a point: without it every career would walk to
+    # the Race tab to be told there is nothing to spend.
+    tt_last_empty_at: int
     # 0 never restores TP, so a career fails rather than being paid for.
     # Higher values authorise spending, carats included - which is real
     # currency, so the default stays 0.
@@ -136,6 +146,7 @@ class TaskDetail:
 class EndTaskReason(Enum):
     TP_NOT_ENOUGH = "Not enough TP to start a run"
     TP_WAIT = "Waiting for TP to regenerate"
+    TEAM_TRIALS_DONE = "Team trials finished; back to waiting for TP"
     STOP_AT_SPARK_REROLL = "Stopped at the spark reroll screen"
 
 
@@ -171,7 +182,11 @@ class UmaItTask(Task):
         """
         try:
             detail = getattr(self, 'detail', None)
-            if detail is not None and reason is EndTaskReason.TP_WAIT:
+            if detail is not None and reason is EndTaskReason.TEAM_TRIALS_DONE:
+                # Neither a career nor an attempt at one: the loop filled a gap
+                # in the TP wait, which still stands and still holds it back.
+                pass
+            elif detail is not None and reason is EndTaskReason.TP_WAIT:
                 # Not a failure: the career never started, and the only thing
                 # missing regenerates on its own. Counted as a failure it took
                 # three attempts - 25 seconds - to stop a healthy loop.
@@ -292,6 +307,9 @@ def build_task(task_execute_mode: TaskExecuteMode, task_type: int,
     td.consecutive_failures = _int(data.get('consecutive_failures'), 0, 0)
     td.resume_after = _int(data.get('resume_after'), 0, 0)
     td.tp_waited_seconds = _int(data.get('tp_waited_seconds'), 0, 0)
+    td.team_trials_while_waiting = bool(data.get('team_trials_while_waiting', False))
+    td.tt_pending = bool(data.get('tt_pending', False))
+    td.tt_last_empty_at = _int(data.get('tt_last_empty_at'), 0, 0)
     td.allow_recover_tp = _int(data.get('allow_recover_tp'), 0, 0)
 
     td.skip_learn_skill = bool(data.get('skip_learn_skill', True))

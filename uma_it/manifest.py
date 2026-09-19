@@ -14,6 +14,7 @@ one.
 from typing import Any, Callable, Dict
 
 from bot.base.manifest import AppManifest
+from uma_it import team_trials
 from bot.base.resource import NOT_FOUND_UI, UI
 import bot.base.log as logger
 
@@ -208,6 +209,12 @@ script_dicts: Dict[UmaItTaskType, Dict[UI, Callable]] = {
 
 def exec_script(ctx):
     """Dispatch one frame to its handler."""
+    # A team trials session claims every frame it runs through: the bot is on
+    # the Race tab, where the career handlers' click points mean other things.
+    # This sits here rather than in before_hook because the engine calls that
+    # and then dispatches anyway - a hook cannot claim a frame.
+    if team_trials.active(ctx) and team_trials.run_frame(ctx):
+        return
     table = script_dicts.get(ctx.task.task_type)
     if table and ctx.current_ui in table:
         table[ctx.current_ui](ctx)

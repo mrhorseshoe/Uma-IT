@@ -47,6 +47,25 @@ REF_BORROW_CARD = Template("borrow_card", REF_TEMPLATE_PATH)
 REF_INDEPENDENT_TRAINING_TAB = Template("independent_training_tab", REF_TEMPLATE_PATH)
 REF_NEXT = Template("next", REF_TEMPLATE_PATH)
 
+# Team trials, run while the loop waits for TP - see uma_it/team_trials.py.
+# All nine crops are the parent project's, moved byte for byte.
+REF_TT_HOME = Template("tt_home_gift", REF_TEMPLATE_PATH)
+REF_TT_TEAM_TRIALS = Template("tt_team_trials", REF_TEMPLATE_PATH)
+REF_TT_TEAM_RACE = Template("tt_team_race", REF_TEMPLATE_PATH)
+REF_TT_SELECT_OPPONENT = Template("tt_select_opp", REF_TEMPLATE_PATH)
+REF_TT_SEE_ALL = Template("tt_see_all", REF_TEMPLATE_PATH)
+REF_TT_SEE_RESULTS = Template("tt_see_results", REF_TEMPLATE_PATH)
+REF_TT_NEXT_RESULT = Template("tt_next2", REF_TEMPLATE_PATH)
+# "You have no RP" - the session's expected end. Both are searched inside the
+# region they occupy, because the crops are small enough to turn up elsewhere.
+# The countdown screen's menu holds "To Home" - and "Give Up", which abandons
+# the career, 330px to its right. This crop is why that click is never blind.
+REF_TT_TO_HOME = Template("tt_to_home", REF_TEMPLATE_PATH)
+REF_TT_CANT = Template("tt_cant_tt", REF_TEMPLATE_PATH,
+                       ImageMatchConfig(match_area=Area(369, 586, 439, 609)))
+REF_TT_CANT_2 = Template("tt_cant_tt2", REF_TEMPLATE_PATH,
+                         ImageMatchConfig(match_area=Area(391, 43, 433, 81)))
+
 # --- required by the vendored engine ------------------------------------
 # The engine reaches for these two by name. They are not part of any screen
 # definition, which is why they arrive separately from the 28 above.

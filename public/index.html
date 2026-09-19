@@ -395,9 +395,16 @@ pre#log {
 
     <div class="field">
       <label for="tp">Restore TP when it runs out
-        <span class="hint">Uses a TP item if you hold one, carats otherwise. A chocolate item is never spent. Off fails the career instead.</span>
+        <span class="hint">Uses a TP item if you hold one, carats otherwise. A chocolate item is never spent. Off waits for TP instead.</span>
       </label>
       <span class="switch"><input type="checkbox" id="tp"><span></span></span>
+    </div>
+
+    <div class="field">
+      <label for="teamtrials">Run team trials with spare RP
+        <span class="hint">While a career runs itself and while waiting for TP. Spends RP, which nothing else here uses and which stops building up once it caps at 5.</span>
+      </label>
+      <span class="switch"><input type="checkbox" id="teamtrials"><span></span></span>
     </div>
     <div class="controls">
       <button type="submit" class="primary" id="save">Save task</button>
@@ -938,7 +945,7 @@ function render(status, state) {
 
   $("state").textContent = finished
     ? "Done"
-    : waiting ? "Waiting for TP"
+    : waiting ? (d.tt_pending ? "Team trials" : "Waiting for TP")
     : running ? (it.active ? "Training" : "Running")
     : status.status === "stopped" ? "Stopped" : status.status;
 
@@ -1001,6 +1008,7 @@ function renderTask() {
     ["Legacy", d.use_last_parents ? "keep last" : "auto-select"],
     ["Skills", d.skip_learn_skill ? "skipped" : "requested"],
     ["TP", d.allow_recover_tp ? "may spend" : "never spend"],
+    ["Team trials", d.team_trials_while_waiting ? "with spare RP" : "off"],
     ...(d.skip_learn_skill ? [] : [["Priorities", tierSummary(d)]]),
     ...(d.spark_reroll_enabled ? [["Reroll", sparkSummary(d)]] : []),
   ].map(([k, v]) => `<div><span class="k">${k}</span> ${v}</div>`).join("");
@@ -1030,6 +1038,7 @@ function openForm() {
   $("parents").checked = d.use_last_parents ?? true;
   $("skills").checked = d.skip_learn_skill ?? true;
   $("tp").checked = !!d.allow_recover_tp;
+  $("teamtrials").checked = !!d.team_trials_while_waiting;
 
   const tiers = d.learn_skill_list || [];
   for (let i = 0; i < 3; i++) tagBoxes["tier" + i].set(tiers[i] || []);
@@ -1136,6 +1145,7 @@ async function saveTask(ev) {
     // The engine reads this as a level, not a flag: 0 never spends, higher
     // values authorise it, carats included.
     allow_recover_tp: $("tp").checked ? 2 : 0,
+    team_trials_while_waiting: $("teamtrials").checked,
   };
   $("save").disabled = true;
   try {

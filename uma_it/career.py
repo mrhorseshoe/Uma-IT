@@ -4,11 +4,13 @@ These two screens are where a career spends nearly all of its wall-clock time.
 Fifty of a career's fifty-two minutes are the countdown, and the job there is
 to do nothing correctly, which is harder than it sounds.
 """
+import re
 import time
 
 from bot.recog.ocr import ocr_line
 import bot.base.log as logger
 
+from uma_it import team_trials
 from uma_it.asset.point import INDEPENDENT_TRAINING_RESULTS_OK
 
 log = logger.get_logger(__name__)
@@ -67,7 +69,34 @@ def script_wait(ctx):
         log.info(f"Independent Training in progress - {remaining}")
         career.last_countdown_log = minute
 
+    # The career runs itself from here, so this is the cheapest RP in the loop.
+    # Still no click: the flag hands the next frame to the team trials flow,
+    # which walks out to the Race tab and walks back in when the RP is gone.
+    try:
+        left = minutes_left(remaining)
+        if (team_trials.due(ctx) and left is not None
+                and left >= team_trials.MIN_CAREER_MINUTES_LEFT):
+            team_trials.begin_in_career(ctx)
+            return
+    except Exception as e:
+        # Never at the cost of the career: an exception on this path reaches
+        # the executor's catch-all, which fails the run.
+        log.warning(f"Team trials check failed, staying on the countdown: {e}")
+
     time.sleep(POLL_SECONDS)
+
+
+def minutes_left(remaining: str):
+    """Minutes on the countdown, or None when it could not be read.
+
+    None means "do not decide anything": an unreadable countdown is no basis
+    for leaving a career, and the read is retried a few seconds later anyway.
+    """
+    m = re.search(r'(\d+):(\d{2}):(\d{2})', remaining or '')
+    if m:
+        return int(m.group(1)) * 60 + int(m.group(2))
+    m = re.search(r'(\d+):(\d{2})', remaining or '')
+    return int(m.group(1)) if m else None
 
 
 def script_results(ctx):

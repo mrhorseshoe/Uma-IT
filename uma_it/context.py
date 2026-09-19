@@ -83,6 +83,25 @@ class CareerContext:
         self.manual_purchase_completed: bool = False
         self.manual_purchase_initiated: bool = False
 
+        # -- team trials, inside a TP wait ------------------------------------
+        # When the session began, and when it last recognised something. A race
+        # needs no clicks for minutes at a time, so quiet is normal; quiet for
+        # longer than a race means the flow is stuck and the session ends.
+        # Set while the bot has stepped out of a running career to spend RP.
+        # Run-scoped on purpose: the career it belongs to does not survive a
+        # restart, so neither should the trip out of it.
+        self.tt_active: bool = False
+        # Whether this session started from a running career, which decides
+        # how it gets to Home: the countdown's menu, or the Back button the
+        # career start screens have.
+        self.tt_from_career: bool = False
+        self.tt_started_at: float = 0.0
+        self.tt_last_action_at: float = 0.0
+        # Back clicks spent walking out to Home, and whether the flow has got
+        # past Home - after which Back would lose a race rather than help.
+        self.tt_back_clicks: int = 0
+        self.tt_raced: bool = False
+
         # -- Home ------------------------------------------------------------
         # Consecutive frames where the CAREER button was not found by colour.
         # The first misses are the screen still transitioning after the button

@@ -40,7 +40,7 @@ from bot.recog.ocr import ocr_line, find_similar_text
 from bot.base.task import TaskStatus
 import bot.base.log as logger
 
-from uma_it import agenda, spark, start, tp
+from uma_it import agenda, spark, start, team_trials, tp
 from uma_it.asset.template import UI_INFO, REF_NEXT
 from uma_it.asset.dialog_titles import ALL_TITLES
 from uma_it.parse import is_spark_selection_screen
@@ -54,6 +54,7 @@ from uma_it.asset.point import (
     CULTIVATE_LEARN_SKILL_DONE_CONFIRM,
     STORY_REWARDS_COLLECTED_CLOSE,
     NETWORK_ERROR_CONFIRM,
+    RP_RESTORE_NO,
     TO_RECOVER_TP,
     TO_CULTIVATE_PREPARE_NEXT,
     CULTIVATE_GOAL_RACE_INTER_3,
@@ -187,6 +188,14 @@ def _tp_recovery(ctx, body: str = ''):
     the screen that follows is commented out, which is why 332 `Recover TP`
     frames appear in its logs with nothing acting on them.
     """
+    # The RP prompt wears the same 'Confirm' title as the TP one. Read as TP it
+    # cost a career on 19 Sep: the bot declined "restore RP?" and held the loop
+    # for half an hour while a career was still running.
+    if team_trials.is_rp_prompt(body):
+        log.info(f"Not enough RP ({body!r}) - declining; RP is not worth carats")
+        ctx.ctrl.click_by_point(RP_RESTORE_NO)
+        time.sleep(1)
+        return
     if not tp.allowed(ctx):
         _wait_for_tp(ctx, body, "allow_recover_tp is 0")
         return
@@ -211,6 +220,13 @@ def _wait_for_tp(ctx, body: str, why: str):
     missing = tp.shortfall(body)
     seconds = tp.wait_seconds(missing)
     ctx.task.detail.resume_after = int(time.time()) + seconds
+    # RP regenerates whether or not it is used and caps at 5, so a wait is
+    # exactly when team trials are free. The session runs first; the wait
+    # outlives it and still holds the next career back. `due` rather than
+    # `wanted`: RP emptied minutes ago is still empty, and asking again means
+    # walking to the Race tab to be told so.
+    if team_trials.due(ctx):
+        ctx.task.detail.tt_pending = True
     log.info(f"TP restore offered ({body!r}) - declining ({why}); "
              f"{missing if missing else 'an unknown amount of'} TP short, "
              f"waiting {round(seconds / 60)} min, until "
