@@ -19,6 +19,7 @@ arriving part-way through - after a restart, say - still works.
 One inherited rule kept deliberately: **never spend a chocolate TP item.**
 Those are event items people keep, and carats are the cheaper thing to lose.
 """
+import re
 import time
 
 import bot.base.log as logger
@@ -57,6 +58,34 @@ MAX_STEPS = 10
 def allowed(ctx) -> bool:
     """True when the task authorises restoring TP at all."""
     return bool(getattr(ctx.task.detail, 'allow_recover_tp', 0))
+
+
+# TP comes back a point at a time, and a career needs 30. The wait is sized
+# from what the game says is missing, then re-checked rather than trusted: too
+# short costs one screen visit, too long costs careers. Hence the half-hour
+# cap, and a floor so a retry cannot spin.
+TP_REGEN_SECONDS = 600
+MIN_WAIT_SECONDS = 300
+MAX_WAIT_SECONDS = 1800
+
+
+def shortfall(body_text: str) -> int:
+    """The TP the prompt says is missing, or 0 when it does not say.
+
+    The game writes "You need 2 more TP to start a Career Scenario", usually
+    followed by a second, larger figure for Event Boost - which this app never
+    uses, so only the first number counts.
+    """
+    m = re.search(r'need\s*(\d+)\s*more\s*tp', (body_text or '').lower())
+    return int(m.group(1)) if m else 0
+
+
+def wait_seconds(missing: int) -> int:
+    """How long to hold the loop when `missing` TP are needed."""
+    if missing <= 0:
+        return MAX_WAIT_SECONDS
+    return max(MIN_WAIT_SECONDS,
+               min(MAX_WAIT_SECONDS, missing * TP_REGEN_SECONDS + 60))
 
 
 def step(ctx, body_text: str = '', header_pos=None) -> bool:

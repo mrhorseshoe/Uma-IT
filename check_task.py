@@ -11,7 +11,7 @@ So: build a task, serialize it with the engine's real serializer, rebuild it,
 and compare. Plus the two payload shapes that must not raise - an empty one,
 and one from the parent project carrying fifty keys this app does not know.
 """
-import os, sys
+import os, sys, time
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.getcwd())
 
@@ -176,6 +176,72 @@ check("  and comes back identical through the real serializer",
 t9 = build_task(LOOP, 1, "sparks", None, REAL)
 check("a task saved before the field existed restores with no requirement",
       t9.detail.spark_skill_targets == [], str(t9.detail.spark_skill_targets))
+
+# Being short of TP is not a failed career: the run never started, and TP comes
+# back on its own. Counted as failures, three of them stopped a healthy loop in
+# 25 seconds on 19 Sep - the last attempt was 1 TP short.
+print("\nwaiting for TP rather than failing")
+t12 = build_task(LOOP, 0, "tp", None, dict(REAL, loops_done=5, loop_count=0,
+                                           consecutive_failures=1))
+t12.detail.resume_after = int(time.time()) + 900
+t12.end_task(TaskStatus.TASK_STATUS_FAILED, UmaItEndReason.TP_WAIT)
+check("a TP wait is not counted as a failure", t12.detail.consecutive_failures == 1,
+      str(t12.detail.consecutive_failures))
+check("  nor as a run", t12.detail.loops_done == 5, str(t12.detail.loops_done))
+check("  and the time waited is tracked", 890 <= t12.detail.tp_waited_seconds <= 900,
+      str(t12.detail.tp_waited_seconds))
+back = build_task(LOOP, 0, "tp", None, serialize_umamusume_task(t12) or {})
+check("  the resume time survives the restart",
+      back.detail.resume_after == t12.detail.resume_after, str(back.detail.resume_after))
+t12.start_task()
+check("  and starting a run clears it", t12.detail.resume_after == 0,
+      str(t12.detail.resume_after))
+t12.end_task(TaskStatus.TASK_STATUS_SUCCESS, EndTaskReason.COMPLETE)
+check("  a completed career forgets the waiting", t12.detail.tp_waited_seconds == 0,
+      str(t12.detail.tp_waited_seconds))
+
+# The scheduler is what actually holds the loop back.
+from bot.engine.scheduler import scheduler as sched
+from uma_it.task import MAX_TP_WAIT_SECONDS
+
+
+class FakeExecutor:
+    active = False
+
+    def __init__(self):
+        self.started = []
+
+    def start(self, *tasks):
+        self.started.append(tasks)
+
+
+t13 = build_task(LOOP, 0, "tp", None, dict(REAL, loops_done=1, loop_count=0))
+t13.task_status = TaskStatus.TASK_STATUS_PENDING
+t13.detail.resume_after = int(time.time()) + 600
+sched.task_list = [t13]
+sched.active = True
+sched.stop_after_run = False
+fe = FakeExecutor()
+sched.tick(fe)
+check("the scheduler starts nothing while the wait stands", fe.started == [],
+      str(fe.started))
+t13.detail.resume_after = int(time.time()) - 1
+sched.tick(fe)
+time.sleep(0.3)
+check("  and starts the next career once it passes", len(fe.started) == 1,
+      str(fe.started))
+sched.active = False
+sched.task_list = []
+
+# A few points short is worth waiting for; a whole working day short is a
+# different problem and should say so rather than retry into the evening.
+sched.active = True
+t14 = build_task(LOOP, 0, "tp", None, dict(REAL, loops_done=1, loop_count=0))
+t14.detail.resume_after = int(time.time()) + MAX_TP_WAIT_SECONDS
+t14.end_task(TaskStatus.TASK_STATUS_FAILED, UmaItEndReason.TP_WAIT)
+check(f"waiting {MAX_TP_WAIT_SECONDS // 3600}h for TP stops the loop",
+      sched.active is False, str(sched.active))
+sched.active = False
 
 # Runs whose kept sparks met every requirement, shown on the dashboard. Bumped
 # at the spark decision and written by the same end-of-run save as loops_done.

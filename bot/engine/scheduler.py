@@ -114,6 +114,13 @@ class Scheduler:
                         loop_limit = getattr(detail, 'loop_count', 0) or 0
                         loops_done = getattr(detail, 'loops_done', 0) or 0
                         limit_reached = loop_limit > 0 and loops_done >= loop_limit
+                        # An app can ask for the next run to be held back -
+                        # uma-it sets this when the game wants TP it will not
+                        # pay for, so the loop waits for it to regenerate
+                        # rather than failing three careers in half a minute.
+                        resume_after = getattr(detail, 'resume_after', 0) or 0
+                        if resume_after and time.time() < resume_after:
+                            continue
                         if task.task_status in [TaskStatus.TASK_STATUS_SUCCESS, TaskStatus.TASK_STATUS_FAILED]:
                             if not limit_reached:
                                 task.task_status = TaskStatus.TASK_STATUS_PENDING

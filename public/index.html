@@ -931,8 +931,14 @@ function render(status, state) {
   const d = task && task.detail;
   const finished = isFinished(d);
 
+  // Short of TP, the bot holds the next career rather than failing it, so the
+  // scheduler is running with nothing happening. Say which it is.
+  const waitUntil = d && d.resume_after ? d.resume_after * 1000 : 0;
+  const waiting = running && !finished && waitUntil > Date.now();
+
   $("state").textContent = finished
     ? "Done"
+    : waiting ? "Waiting for TP"
     : running ? (it.active ? "Training" : "Running")
     : status.status === "stopped" ? "Stopped" : status.status;
 
@@ -940,6 +946,10 @@ function render(status, state) {
   if (finished) {
     tag.hidden = false;
     tag.textContent = `${d.loops_done} of ${d.loop_count} careers`;
+  } else if (waiting) {
+    tag.hidden = false;
+    const mins = Math.max(1, Math.round((waitUntil - Date.now()) / 60000));
+    tag.textContent = `next career in ~${mins} min`;
   } else if (status.stop_after_run) {
     tag.hidden = false;
     tag.textContent = "stopping after this run";
@@ -1110,6 +1120,9 @@ async function saveTask(ev) {
     // Carried forward so editing a task does not reset the run count.
     loops_done: (task && task.detail && task.detail.loops_done) || 0,
     spark_goal_runs: (task && task.detail && task.detail.spark_goal_runs) || 0,
+    // Kept so saving a task mid-wait does not send it straight back to a
+    // career the game will refuse.
+    resume_after: (task && task.detail && task.detail.resume_after) || 0,
     use_last_parents: $("parents").checked,
     skip_learn_skill: $("skills").checked,
     learn_skill_list: [0, 1, 2].map((i) => tagBoxes["tier" + i].get()),

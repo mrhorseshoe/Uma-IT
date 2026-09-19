@@ -20,6 +20,7 @@ soft-restarts after every career, so `loops_done` is only correct because it is
 a task field - serialized with the task and reloaded at boot. The run context
 is rebuilt from nothing every time.
 """
+import time
 from enum import Enum
 
 from bot.base.task import Task, TaskExecuteMode, TaskStatus
@@ -36,6 +37,13 @@ APP_NAME = "uma-it"
 # while a real cause - no TP, a game update, a changed screen - fails every
 # time and would otherwise retry until someone noticed.
 MAX_CONSECUTIVE_FAILURES = 3
+
+# Total time the loop may spend waiting for TP without a career completing.
+# Waiting is the right answer to an account that is a few points short, but an
+# account that is short for a whole working day is short for some other reason
+# - the run was spent elsewhere, the game changed - and the loop should stop
+# and say so rather than retry into the evening.
+MAX_TP_WAIT_SECONDS = 8 * 3600
 
 
 class TaskDetail:
@@ -63,6 +71,13 @@ class TaskDetail:
     # different things: a career that never started is not a career the user
     # asked for. See `UmaItTask.end_task`.
     consecutive_failures: int
+    # Epoch seconds before which no career may start: set when the game asks
+    # for TP the task will not pay for, so the loop waits for it to regenerate
+    # instead of failing. Durable - the scheduler reads it after the restart -
+    # and cleared when a run starts. `tp_waited_seconds` is how long has been
+    # spent waiting since the last career completed; see MAX_TP_WAIT_SECONDS.
+    resume_after: int
+    tp_waited_seconds: int
     # 0 never restores TP, so a career fails rather than being paid for.
     # Higher values authorise spending, carats included - which is real
     # currency, so the default stays 0.
@@ -120,6 +135,7 @@ class TaskDetail:
 
 class EndTaskReason(Enum):
     TP_NOT_ENOUGH = "Not enough TP to start a run"
+    TP_WAIT = "Waiting for TP to regenerate"
     STOP_AT_SPARK_REROLL = "Stopped at the spark reroll screen"
 
 
@@ -155,8 +171,27 @@ class UmaItTask(Task):
         """
         try:
             detail = getattr(self, 'detail', None)
-            if detail is not None and status == TaskStatus.TASK_STATUS_SUCCESS:
+            if detail is not None and reason is EndTaskReason.TP_WAIT:
+                # Not a failure: the career never started, and the only thing
+                # missing regenerates on its own. Counted as a failure it took
+                # three attempts - 25 seconds - to stop a healthy loop.
+                waiting = max(0, int(getattr(detail, 'resume_after', 0) or 0)
+                              - int(time.time()))
+                detail.tp_waited_seconds = (getattr(detail, 'tp_waited_seconds', 0) or 0) + waiting
+                log.info("Not enough TP - holding the loop for %d min "
+                         "(%d min waited since the last career); not counted "
+                         "as a run or a failure"
+                         % (round(waiting / 60), round(detail.tp_waited_seconds / 60)))
+                if detail.tp_waited_seconds >= MAX_TP_WAIT_SECONDS:
+                    log.error("Waited %d hours for TP without a career starting "
+                              "- stopping the loop. Check the account's TP, then "
+                              "start it again from the dashboard."
+                              % round(detail.tp_waited_seconds / 3600))
+                    from bot.engine.scheduler import scheduler
+                    scheduler.stop()
+            elif detail is not None and status == TaskStatus.TASK_STATUS_SUCCESS:
                 detail.consecutive_failures = 0
+                detail.tp_waited_seconds = 0
                 detail.loops_done = (getattr(detail, 'loops_done', 0) or 0) + 1
                 limit = getattr(detail, 'loop_count', 0) or 0
                 log.info("Loop run %d/%s finished"
@@ -182,6 +217,10 @@ class UmaItTask(Task):
         super().end_task(status, reason)
 
     def start_task(self) -> None:
+        # A run is starting, so whatever TP wait was outstanding is over.
+        detail = getattr(self, 'detail', None)
+        if detail is not None:
+            detail.resume_after = 0
         super().start_task()
 
 
@@ -251,6 +290,8 @@ def build_task(task_execute_mode: TaskExecuteMode, task_type: int,
     td.loop_count = _int(data.get('loop_count'), 0, 0)
     td.loops_done = _int(data.get('loops_done'), 0, 0)
     td.consecutive_failures = _int(data.get('consecutive_failures'), 0, 0)
+    td.resume_after = _int(data.get('resume_after'), 0, 0)
+    td.tp_waited_seconds = _int(data.get('tp_waited_seconds'), 0, 0)
     td.allow_recover_tp = _int(data.get('allow_recover_tp'), 0, 0)
 
     td.skip_learn_skill = bool(data.get('skip_learn_skill', True))

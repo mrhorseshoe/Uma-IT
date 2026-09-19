@@ -188,15 +188,34 @@ def _tp_recovery(ctx, body: str = ''):
     frames appear in its logs with nothing acting on them.
     """
     if not tp.allowed(ctx):
-        log.info(f"TP restore offered ({body!r}) - declining and failing the "
-                 f"career (allow_recover_tp is 0)")
-        ctx.task.end_task(TaskStatus.TASK_STATUS_FAILED, EndTaskReason.TP_NOT_ENOUGH)
+        _wait_for_tp(ctx, body, "allow_recover_tp is 0")
         return
     career = getattr(ctx, 'career', None)
     header = getattr(career, 'dialog_header_pos', None)
     if not tp.step(ctx, body, header):
-        log.warning("TP restore could not proceed - failing the career")
-        ctx.task.end_task(TaskStatus.TASK_STATUS_FAILED, EndTaskReason.TP_NOT_ENOUGH)
+        _wait_for_tp(ctx, body, "the restore could not proceed")
+
+
+def _wait_for_tp(ctx, body: str, why: str):
+    """Hold the loop until TP has come back, rather than failing the career.
+
+    Declining costs nothing - the career has not started - so being a few TP
+    short is not a failed run, it is an early one. It used to be counted as a
+    failure, and three in a row stop the loop: on 19 Sep that ended a session
+    at 05:03 while the game was asking for **one** more TP, and the next two
+    attempts came 13 and 12 seconds later.
+
+    The resume time goes on the task, so it survives the restart after each
+    career, and the scheduler starts nothing until it passes.
+    """
+    missing = tp.shortfall(body)
+    seconds = tp.wait_seconds(missing)
+    ctx.task.detail.resume_after = int(time.time()) + seconds
+    log.info(f"TP restore offered ({body!r}) - declining ({why}); "
+             f"{missing if missing else 'an unknown amount of'} TP short, "
+             f"waiting {round(seconds / 60)} min, until "
+             f"{time.strftime('%H:%M', time.localtime(ctx.task.detail.resume_after))}")
+    ctx.task.end_task(TaskStatus.TASK_STATUS_FAILED, EndTaskReason.TP_WAIT)
 
 
 def _auto_select(ctx):

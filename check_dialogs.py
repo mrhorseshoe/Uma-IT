@@ -86,13 +86,20 @@ ctx = route('Career Complete')
 check("'Career Complete' cancels the return prompt",
       ctx.ctrl.clicks == [NAME(CULTIVATE_FINISH_RETURN_CONFIRM)], str(ctx.ctrl.clicks))
 
-print("\nthe TP decision, which is how the loop stops")
-ctx = route('Confirm', allow_recover_tp=0)
+print("\nthe TP decision, which now holds the loop instead of stopping it")
+import time as _time
+ctx = route('Confirm', body='You need 2 more TP to start a Career Scenario.',
+            allow_recover_tp=0)
 check("declines when allow_recover_tp is 0", ctx.ctrl.clicks == [], str(ctx.ctrl.clicks))
-check("  and fails the career", [s for s, _ in ctx.ended] == [TaskStatus.TASK_STATUS_FAILED],
+check("  and ends the run", [s for s, _ in ctx.ended] == [TaskStatus.TASK_STATUS_FAILED],
       str(ctx.ended))
-check("  for the right reason",
-      [r for _, r in ctx.ended] == [EndTaskReason.TP_NOT_ENOUGH], str(ctx.ended))
+# As TP_NOT_ENOUGH this counted as a failure, and three in a row stop the loop:
+# on 19 Sep that ended a session while the game was asking for one more TP.
+check("  as a TP wait, not a failure",
+      [r for _, r in ctx.ended] == [EndTaskReason.TP_WAIT], str(ctx.ended))
+waited = ctx.task.detail.resume_after - int(_time.time())
+check("  and holds the next run for the shortfall (2 TP -> ~21 min)",
+      1200 <= waited <= 1320, str(waited))
 
 ctx = route('Confirm', allow_recover_tp=2)
 check("accepts when the task authorises spending",

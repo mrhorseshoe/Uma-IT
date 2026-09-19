@@ -159,8 +159,8 @@ check("'Confirm' during a reroll does not fail the career", ctx.ended == [],
 # ...but with no reroll in flight it still must.
 ctx = FakeCtx(allow_recover_tp=0)
 dialogs.script_dialog(ctx)
-check("'Confirm' outside a reroll still fails the career",
-      [r for _, r in ctx.ended] == [EndTaskReason.TP_NOT_ENOUGH], str(ctx.ended))
+check("'Confirm' outside a reroll still ends the run, to wait for TP",
+      [r for _, r in ctx.ended] == [EndTaskReason.TP_WAIT], str(ctx.ended))
 
 print("\nan aborted reroll keeps the original sparks")
 ctx = FakeCtx(career_state={'parse_factor_done': True, 'spark_reroll_phase': 'abort'},

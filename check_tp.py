@@ -143,6 +143,30 @@ check("the game's own capitalisation is accepted", acted is True)
 check("  and it opens the recovery screen",
       ctx.ctrl.clicks == [NAME(TO_RECOVER_TP)], str(ctx.ctrl.clicks))
 
+# Being a few TP short is not a failed career - the run never started, and the
+# thing that is missing comes back on its own. On 19 Sep three of those in a
+# row stopped a healthy loop in 25 seconds, the last one asking for 1 TP.
+print("\nsizing the wait from what the prompt says is missing")
+check("reads the shortfall out of the game's sentence",
+      tp.shortfall("You need 2 more TP to start a Career Scenario"
+                   "and 32 more TP if you wish to use Event Boost.") == 2,
+      str(tp.shortfall("You need 2 more TP to start a Career Scenario"
+                       "and 32 more TP if you wish to use Event Boost.")))
+check("  and takes the career figure, not the Event Boost one",
+      tp.shortfall("you need 1 more tp to start a career scenario"
+                   "and 31 more tp if you wish to use event boost.") == 1)
+check("  a prompt that does not say reads 0", tp.shortfall("Restore TP?") == 0)
+check("1 TP short waits one regeneration plus slack",
+      tp.wait_seconds(1) == tp.TP_REGEN_SECONDS + 60, str(tp.wait_seconds(1)))
+check("  and the floor only applies to a shorter estimate",
+      tp.wait_seconds(1) > tp.MIN_WAIT_SECONDS, str(tp.wait_seconds(1)))
+check("  3 TP short waits about half an hour",
+      tp.wait_seconds(3) == tp.MAX_WAIT_SECONDS, str(tp.wait_seconds(3)))
+check("  and an unknown shortfall waits the cap",
+      tp.wait_seconds(0) == tp.MAX_WAIT_SECONDS, str(tp.wait_seconds(0)))
+check("  never longer than the cap, so the estimate is re-checked",
+      tp.wait_seconds(30) == tp.MAX_WAIT_SECONDS, str(tp.wait_seconds(30)))
+
 print("\ngiving up rather than feeding the click guard")
 ctx = FakeCtx(allow_recover_tp=2)
 ctx.career.tp_recover_tries = tp.MAX_STEPS
