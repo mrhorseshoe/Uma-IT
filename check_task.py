@@ -188,8 +188,18 @@ t12.end_task(TaskStatus.TASK_STATUS_FAILED, UmaItEndReason.TP_WAIT)
 check("a TP wait is not counted as a failure", t12.detail.consecutive_failures == 1,
       str(t12.detail.consecutive_failures))
 check("  nor as a run", t12.detail.loops_done == 5, str(t12.detail.loops_done))
-check("  and the time waited is tracked", 890 <= t12.detail.tp_waited_seconds <= 900,
-      str(t12.detail.tp_waited_seconds))
+# Elapsed, not the sum of the waits it planned. A wait cut short - by a team
+# trials session, or a restart - used to count in full: on 19 Sep the loop had
+# clocked 210 minutes of waiting against 150 minutes of being short of TP,
+# which would have stopped it two hours early.
+check("  the clock starts on the first wait", t12.detail.tp_wait_since > 0,
+      str(t12.detail.tp_wait_since))
+check("  and counts elapsed time, not the wait it asked for",
+      t12.detail.tp_waited_seconds < 60, str(t12.detail.tp_waited_seconds))
+t12.detail.tp_wait_since = int(time.time()) - 3600
+t12.end_task(TaskStatus.TASK_STATUS_FAILED, UmaItEndReason.TP_WAIT)
+check("  so an hour short of TP reads as an hour",
+      3600 <= t12.detail.tp_waited_seconds <= 3660, str(t12.detail.tp_waited_seconds))
 back = build_task(LOOP, 0, "tp", None, serialize_umamusume_task(t12) or {})
 check("  the resume time survives the restart",
       back.detail.resume_after == t12.detail.resume_after, str(back.detail.resume_after))
@@ -197,8 +207,9 @@ t12.start_task()
 check("  and starting a run clears it", t12.detail.resume_after == 0,
       str(t12.detail.resume_after))
 t12.end_task(TaskStatus.TASK_STATUS_SUCCESS, EndTaskReason.COMPLETE)
-check("  a completed career forgets the waiting", t12.detail.tp_waited_seconds == 0,
-      str(t12.detail.tp_waited_seconds))
+check("  a completed career forgets the waiting",
+      t12.detail.tp_waited_seconds == 0 and t12.detail.tp_wait_since == 0,
+      f"{t12.detail.tp_waited_seconds} {t12.detail.tp_wait_since}")
 
 # The scheduler is what actually holds the loop back.
 from bot.engine.scheduler import scheduler as sched
@@ -237,7 +248,7 @@ sched.task_list = []
 # different problem and should say so rather than retry into the evening.
 sched.active = True
 t14 = build_task(LOOP, 0, "tp", None, dict(REAL, loops_done=1, loop_count=0))
-t14.detail.resume_after = int(time.time()) + MAX_TP_WAIT_SECONDS
+t14.detail.tp_wait_since = int(time.time()) - MAX_TP_WAIT_SECONDS
 t14.end_task(TaskStatus.TASK_STATUS_FAILED, UmaItEndReason.TP_WAIT)
 check(f"waiting {MAX_TP_WAIT_SECONDS // 3600}h for TP stops the loop",
       sched.active is False, str(sched.active))

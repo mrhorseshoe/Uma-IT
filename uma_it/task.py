@@ -77,6 +77,12 @@ class TaskDetail:
     # and cleared when a run starts. `tp_waited_seconds` is how long has been
     # spent waiting since the last career completed; see MAX_TP_WAIT_SECONDS.
     resume_after: int
+    # When the loop first went short of TP after the last completed career,
+    # and how long that has been. Elapsed, not the sum of the waits it
+    # planned: a wait cut short - by a team trials session, or by a restart -
+    # used to be counted in full, which had the eight-hour cap arriving two
+    # hours early on 19 Sep.
+    tp_wait_since: int
     tp_waited_seconds: int
     # Team trials spend RP, which nothing else here uses and which stops
     # accruing once it caps at 5. Run only inside a TP wait, so they never
@@ -192,10 +198,14 @@ class UmaItTask(Task):
                 # three attempts - 25 seconds - to stop a healthy loop.
                 waiting = max(0, int(getattr(detail, 'resume_after', 0) or 0)
                               - int(time.time()))
-                detail.tp_waited_seconds = (getattr(detail, 'tp_waited_seconds', 0) or 0) + waiting
+                since = getattr(detail, 'tp_wait_since', 0) or 0
+                if not since:
+                    since = int(time.time())
+                    detail.tp_wait_since = since
+                detail.tp_waited_seconds = max(0, int(time.time()) - since)
                 log.info("Not enough TP - holding the loop for %d min "
-                         "(%d min waited since the last career); not counted "
-                         "as a run or a failure"
+                         "(%d min short of TP since the last career); not "
+                         "counted as a run or a failure"
                          % (round(waiting / 60), round(detail.tp_waited_seconds / 60)))
                 if detail.tp_waited_seconds >= MAX_TP_WAIT_SECONDS:
                     log.error("Waited %d hours for TP without a career starting "
@@ -207,6 +217,7 @@ class UmaItTask(Task):
             elif detail is not None and status == TaskStatus.TASK_STATUS_SUCCESS:
                 detail.consecutive_failures = 0
                 detail.tp_waited_seconds = 0
+                detail.tp_wait_since = 0
                 detail.loops_done = (getattr(detail, 'loops_done', 0) or 0) + 1
                 limit = getattr(detail, 'loop_count', 0) or 0
                 log.info("Loop run %d/%s finished"
@@ -306,6 +317,7 @@ def build_task(task_execute_mode: TaskExecuteMode, task_type: int,
     td.loops_done = _int(data.get('loops_done'), 0, 0)
     td.consecutive_failures = _int(data.get('consecutive_failures'), 0, 0)
     td.resume_after = _int(data.get('resume_after'), 0, 0)
+    td.tp_wait_since = _int(data.get('tp_wait_since'), 0, 0)
     td.tp_waited_seconds = _int(data.get('tp_waited_seconds'), 0, 0)
     td.team_trials_while_waiting = bool(data.get('team_trials_while_waiting', False))
     td.tt_pending = bool(data.get('tt_pending', False))
