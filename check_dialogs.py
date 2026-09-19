@@ -16,7 +16,7 @@ sys.path.insert(0, os.getcwd())
 import numpy as np
 
 import uma_it.dialogs as dialogs
-from uma_it.asset.point import (ESCAPE, TO_RECOVER_TP, CULTIVATE_FINISH_RETURN_CONFIRM,
+from uma_it.asset.point import (ESCAPE, RESTORE_NO, TO_RECOVER_TP, CULTIVATE_FINISH_RETURN_CONFIRM,
                                 TO_CULTIVATE_PREPARE_NEXT,
                                 EXIT_WITHOUT_LEARNING_SKILLS_OK)
 from uma_it.context import CareerContext
@@ -90,7 +90,10 @@ print("\nthe TP decision, which now holds the loop instead of stopping it")
 import time as _time
 ctx = route('Confirm', body='You need 2 more TP to start a Career Scenario.',
             allow_recover_tp=0)
-check("declines when allow_recover_tp is 0", ctx.ctrl.clicks == [], str(ctx.ctrl.clicks))
+# The prompt is modal, so declining is not optional: a run that ends with it
+# still up leaves the game behind a popup nothing else can get past.
+check("declines when allow_recover_tp is 0",
+      ctx.ctrl.clicks == [NAME(RESTORE_NO)], str(ctx.ctrl.clicks))
 check("  and ends the run", [s for s, _ in ctx.ended] == [TaskStatus.TASK_STATUS_FAILED],
       str(ctx.ended))
 # As TP_NOT_ENOUGH this counted as a failure, and three in a row stop the loop:
@@ -203,6 +206,23 @@ for title, fn in (('Agenda', 'script_agenda'),
           getattr(original, '__module__', '?'))
 check("  and all three were dispatched",
       reached == ['Agenda', 'My Agendas', 'Overwrite'], str(reached))
+
+# A screen the blind click cannot advance is a trap: the clicks trip the
+# repetitive-click guard, the guard restarts the game, and the game comes back
+# to the same screen. On 19 Sep a team trials session left the bot on one and
+# it clicked for five hours, freed only by a daily-reset dialog it knew.
+print("\nthe blind fallback has a way out of a screen it cannot advance")
+from uma_it.asset.point import HOME_TAB
+ctx = route('nothing-matches-this-title')
+ctx.ctrl.clicks.clear()
+ctx.career.unknown_frames = dialogs.UNKNOWN_FRAMES_BEFORE_HOME - 1
+dialogs.script_not_found_ui(ctx)
+check("a minute of unrecognised frames presses Home",
+      ctx.ctrl.clicks == [NAME(HOME_TAB)], str(ctx.ctrl.clicks))
+ctx.ctrl.clicks.clear()
+dialogs.script_not_found_ui(ctx)
+check("  and not on every frame after that",
+      NAME(HOME_TAB) not in ctx.ctrl.clicks, str(ctx.ctrl.clicks))
 
 print("\nan unknown title")
 ctx = route('Qwerty Nonsense Title')

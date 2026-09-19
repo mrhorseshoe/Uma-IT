@@ -101,6 +101,16 @@ class CareerContext:
         # past Home - after which Back would lose a race rather than help.
         self.tt_back_clicks: int = 0
         self.tt_raced: bool = False
+        # Walking back to Home once the session is over. The frames stay
+        # claimed until Home is on screen: handing them back on a Race tab
+        # screen is what cost five hours on 19 Sep.
+        self.tt_returning: bool = False
+        self.tt_return_clicks: int = 0
+        self.tt_finish_reason: str = ''
+
+        # Frames in a row that matched no screen. The blind fallback cannot
+        # advance every screen, and one it cannot is a trap worth escaping.
+        self.unknown_frames: int = 0
 
         # -- Home ------------------------------------------------------------
         # Consecutive frames where the CAREER button was not found by colour.

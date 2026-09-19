@@ -1,19 +1,29 @@
 from bot.base.manifest import APP_MANIFEST_LIST
 from bot.engine.scheduler import scheduler
 from bot.conn.u2_ctrl import U2AndroidController
+import bot.base.log as logger
 from uma_it.asset.point import ESCAPE
 
+log = logger.get_logger(__name__)
 
+
+# These three are the only ways a person can drive the loop, and until now they
+# left no trace: a loop found stopped could not be told apart from one that
+# stopped itself. On 19 Sep that cost an hour of reading logs to work out that
+# nothing in the bot had stopped it.
 def start():
+    log.info("Start requested - the loop will run tasks again")
     scheduler.start()
 
 
 def stop():
+    log.info("Stop requested - the loop will not start another run")
     scheduler.stop()
 
 
 def toggle_stop_after_run():
     scheduler.stop_after_run = not getattr(scheduler, 'stop_after_run', False)
+    log.info(f"Stop after this run: {'on' if scheduler.stop_after_run else 'off'}")
     return scheduler.stop_after_run
 
 

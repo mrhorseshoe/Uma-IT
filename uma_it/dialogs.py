@@ -53,8 +53,9 @@ from uma_it.asset.point import (
     CULTIVATE_LEARN_SKILL_CONFIRM_AGAIN,
     CULTIVATE_LEARN_SKILL_DONE_CONFIRM,
     STORY_REWARDS_COLLECTED_CLOSE,
+    HOME_TAB,
     NETWORK_ERROR_CONFIRM,
-    RP_RESTORE_NO,
+    RESTORE_NO,
     TO_RECOVER_TP,
     TO_CULTIVATE_PREPARE_NEXT,
     CULTIVATE_GOAL_RACE_INTER_3,
@@ -62,6 +63,12 @@ from uma_it.asset.point import (
 from uma_it.task import EndTaskReason
 
 log = logger.get_logger(__name__)
+
+# Frames in a row matching no screen before the fallback tries the Home tab.
+# The executor dispatches about once a second, so this is roughly a minute -
+# long enough that no ordinary transition reaches it, short enough that a trap
+# costs a minute rather than the five hours it cost on 19 Sep.
+UNKNOWN_FRAMES_BEFORE_HOME = 40
 
 # Titles this table owns are matched only at the tight threshold. The parent
 # runs a second pass at 0.6, which is loose enough that 'Fan' once scored
@@ -193,7 +200,7 @@ def _tp_recovery(ctx, body: str = ''):
     # for half an hour while a career was still running.
     if team_trials.is_rp_prompt(body):
         log.info(f"Not enough RP ({body!r}) - declining; RP is not worth carats")
-        ctx.ctrl.click_by_point(RP_RESTORE_NO)
+        ctx.ctrl.click_by_point(RESTORE_NO)
         time.sleep(1)
         return
     if not tp.allowed(ctx):
@@ -217,6 +224,14 @@ def _wait_for_tp(ctx, body: str, why: str):
     The resume time goes on the task, so it survives the restart after each
     career, and the scheduler starts nothing until it passes.
     """
+    # Say No first, but only to the prompt itself - its No button is at a
+    # coordinate that means something else on the Recover TP screen behind it.
+    # The prompt is modal: a run that ends with it still up leaves the game
+    # behind a popup, and everything that would fill the wait - team trials
+    # especially - is stuck there. On 19 Sep that left three RP unspent.
+    if body and ('restore' in body.lower() or tp.shortfall(body)):
+        ctx.ctrl.click_by_point(RESTORE_NO)
+        time.sleep(1)
     missing = tp.shortfall(body)
     seconds = tp.wait_seconds(missing)
     ctx.task.detail.resume_after = int(time.time()) + seconds
@@ -440,6 +455,22 @@ def script_not_found_ui(ctx):
     # they land here. Intercept before the generic heuristics can click
     # something on them.
     career = getattr(ctx, 'career', None)
+
+    # An unknown screen this blind click cannot advance is a trap: the clicks
+    # trip the repetitive-click guard, the guard restarts the game, the game
+    # comes back to the same screen. On 19 Sep that ran for five hours, ended
+    # only by a daily-reset dialog the bot happened to know. After a minute of
+    # frames nobody recognises, press the bottom nav's Home tab, which exists
+    # on every screen outside a career and leads somewhere this app knows.
+    if career is not None:
+        seen = getattr(career, 'unknown_frames', 0) + 1
+        career.unknown_frames = seen
+        if seen % UNKNOWN_FRAMES_BEFORE_HOME == 0:
+            log.warning(f"{seen} frames in a row match no screen - pressing Home "
+                        f"to get back to something known")
+            ctx.ctrl.click_by_point(HOME_TAB)
+            time.sleep(2)
+            return
     phase = getattr(career, 'spark_reroll_phase', '') if career else ''
     if phase in ('reroll_clicked', 'selected') and ctx.current_screen is not None:
         if is_spark_selection_screen(ctx.current_screen):

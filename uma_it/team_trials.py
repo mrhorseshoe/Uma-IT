@@ -27,6 +27,7 @@ While a session is running this claims every frame, matched or not. The career
 handlers must not see these screens: the bot is on the Race tab, where their
 click points mean other things.
 """
+import os
 import time
 
 import cv2
@@ -37,8 +38,9 @@ from bot.recog.image_matcher import image_match
 from bot.recog.ocr import ocr_line, find_similar_text
 
 from uma_it.asset.point import (
+    HOME_TAB,
     IT_MENU,
-    RP_RESTORE_NO,
+    RESTORE_NO,
     TT_BACK,
     TT_DONE,
     TT_ITEMS_SELECTED_OK,
@@ -78,6 +80,8 @@ QUIET_LIMIT_SECONDS = 240
 # clicking one point is what the repetitive-click guard restarts the game over.
 BACK_OUT_AFTER_SECONDS = 12
 MAX_BACK_CLICKS = 6
+# Presses of the bottom nav's Home tab when walking back at the end.
+MAX_RETURN_CLICKS = 8
 # Five RP is the cap, and a race plus its result screens runs a few minutes.
 SESSION_LIMIT_SECONDS = 1500
 
@@ -162,30 +166,60 @@ def _next_sequence(ctx):
 
 
 def _finish(ctx, why: str):
-    """End the session, and go back to whatever the bot was doing.
+    """Start walking back to Home; `_hand_back` ends the session there.
 
-    Inside a career that means clearing the flag and letting the ordinary
-    handlers walk back in through Home; the career has been running itself the
-    whole time. For a session owed by a TP wait there is nothing to go back
-    to, so the run ends and the wait holds the loop as before.
+    Never hand back where the session happens to end. The Race tab's screens
+    have no templates in this app, so the ordinary handlers see nothing they
+    know and fall through to the blind fallback, which clicks a corner. On
+    19 Sep that ran for **five hours**: one click every second or so, the
+    repetitive-click guard restarting the game every seventeen seconds, and the
+    career finishing unattended. The daily reset dialog was what finally
+    dislodged it. So the session is over only once Home is on screen.
     """
     career = ctx.career
-    detail = ctx.task.detail
     started = getattr(career, 'tt_started_at', 0) or time.time()
-    minutes = round((time.time() - started) / 60)
     # Whatever ended it, RP is either spent or unreachable; either way there is
     # no point asking again before it has had time to come back.
-    detail.tt_last_empty_at = int(time.time())
-    if getattr(career, 'tt_active', False):
-        career.tt_active = False
-        career.tt_started_at = 0.0
-        career.tt_back_clicks = 0
-        career.tt_raced = False
-        log.info(f"🏁 Team trials done ({why}) after {minutes} min - back to the career")
+    ctx.task.detail.tt_last_empty_at = int(time.time())
+    career.tt_returning = True
+    career.tt_return_clicks = 0
+    career.tt_finish_reason = f"{why} after {round((time.time() - started) / 60)} min"
+    log.info(f"🏁 Team trials done ({why}) - heading back to Home")
+    # A session that ends without the game saying no was looking at something
+    # the rules do not name. Keep the frame: on 19 Sep one sat four minutes on
+    # a screen nobody can now identify, because nothing captured it.
+    if not why.startswith("out of RP"):
+        _save_debug(ctx, "unrecognised")
+
+
+def _hand_back(ctx, why: str):
+    """Home is on screen: give the frames back to the ordinary handlers."""
+    career = ctx.career
+    detail = ctx.task.detail
+    reason = getattr(career, 'tt_finish_reason', '') or 'done'
+    career.tt_active = False
+    career.tt_returning = False
+    career.tt_from_career = False
+    career.tt_started_at = 0.0
+    career.tt_back_clicks = 0
+    career.tt_return_clicks = 0
+    career.tt_raced = False
+    if detail.tt_pending:
+        detail.tt_pending = False
+        log.info(f"🏁 Team trials over ({reason}; {why})")
+        ctx.task.end_task(TaskStatus.TASK_STATUS_FAILED, EndTaskReason.TEAM_TRIALS_DONE)
         return
-    detail.tt_pending = False
-    log.info(f"🏁 Team trials done ({why}) after {minutes} min")
-    ctx.task.end_task(TaskStatus.TASK_STATUS_FAILED, EndTaskReason.TEAM_TRIALS_DONE)
+    log.info(f"🏁 Team trials over ({reason}; {why}) - back to the career")
+
+
+def _save_debug(ctx, tag: str):
+    """Keep the frame a session gave up on, the way spark reroll does."""
+    try:
+        os.makedirs('screenshot/team_trials', exist_ok=True)
+        cv2.imwrite(f'screenshot/team_trials/{time.strftime("%Y%m%d_%H%M%S")}_{tag}.png',
+                    ctx.ctrl.get_screen())
+    except Exception as e:
+        log.debug(f"team trials capture failed: {e}")
 
 
 def _to_home(ctx):
@@ -224,7 +258,7 @@ def _decline_rp_restore(ctx):
     not worth carats, and the next session is an hour and a half away anyway.
     """
     log.info("Team trials: the game says RP has run out - declining the restore")
-    ctx.ctrl.click_by_point(RP_RESTORE_NO)
+    ctx.ctrl.click_by_point(RESTORE_NO)
     time.sleep(1)
     _finish(ctx, "out of RP")
 
@@ -243,17 +277,17 @@ def is_rp_prompt(body: str) -> bool:
 # Ordered: the first crop found on the frame decides the click. Out-of-RP comes
 # first so a session ends rather than starting another race it cannot pay for.
 RULES = [
-    (REF_TT_CANT, _out_of_rp),
-    (REF_TT_CANT_2, _out_of_rp),
-    (REF_TT_TO_HOME, _to_home),
-    (REF_TT_HOME, TT_RACE_TAB),
-    (REF_TT_TEAM_TRIALS, TT_TEAM_TRIALS),
-    (REF_TT_TEAM_RACE, TT_TEAM_RACE),
-    (REF_TT_SELECT_OPPONENT, TT_SELECT_OPPONENT),
-    (REF_TT_SEE_ALL, TT_SEE_ALL),
-    (REF_NEXT, _next_sequence),
-    (REF_TT_SEE_RESULTS, TT_SEE_RESULTS),
-    (REF_TT_NEXT_RESULT, TT_NEXT_RESULT),
+    ("no RP left", REF_TT_CANT, _out_of_rp),
+    ("no RP left (2)", REF_TT_CANT_2, _out_of_rp),
+    ("the training menu", REF_TT_TO_HOME, _to_home),
+    ("Home", REF_TT_HOME, TT_RACE_TAB),
+    ("the Race tab", REF_TT_TEAM_TRIALS, TT_TEAM_TRIALS),
+    ("Team Trials", REF_TT_TEAM_RACE, TT_TEAM_RACE),
+    ("the opponent list", REF_TT_SELECT_OPPONENT, TT_SELECT_OPPONENT),
+    ("the race screen", REF_TT_SEE_ALL, TT_SEE_ALL),
+    ("a Next button", REF_NEXT, _next_sequence),
+    ("the results", REF_TT_SEE_RESULTS, TT_SEE_RESULTS),
+    ("the team result", REF_TT_NEXT_RESULT, TT_NEXT_RESULT),
 ]
 
 # Dialogs that can land on this path. The router in dialogs.py never sees them
@@ -278,13 +312,37 @@ def run_frame(ctx) -> bool:
         log.info(f"🏁 Team trials: spending RP {where}")
 
     img = ctx.ctrl.get_screen(to_gray=True)
-    for template, action in RULES:
+
+    # Walking back to Home after the session ended. Bounded: if the Home tab
+    # does not get there, hand back anyway rather than click on forever.
+    if getattr(career, 'tt_returning', False):
+        try:
+            if image_match(img, REF_TT_HOME).find_match:
+                _hand_back(ctx, "Home reached")
+                return True
+        except Exception:
+            pass
+        clicks = getattr(career, 'tt_return_clicks', 0)
+        if clicks >= MAX_RETURN_CLICKS:
+            _hand_back(ctx, f"gave up after {clicks} Home presses")
+            return True
+        career.tt_return_clicks = clicks + 1
+        career.tt_last_action_at = now
+        ctx.ctrl.click_by_point(HOME_TAB)
+        time.sleep(1.5)
+        return True
+
+    for name, template, action in RULES:
         try:
             if not image_match(img, template).find_match:
                 continue
         except Exception as e:
-            log.debug(f"team trials: {template} match failed: {e}")
+            log.debug(f"team trials: {name} match failed: {e}")
             continue
+        # One line per screen the session recognises. Without them a session
+        # that does nothing looks identical to one that raced: on 19 Sep four
+        # minutes of silence could have been any step of the flow.
+        log.info(f"Team trials: on {name}")
         career.tt_last_action_at = now
         # Past Home, so Back is no longer the way out of anything: the rules
         # know these screens, and backing out of a race would lose it.
@@ -306,6 +364,15 @@ def run_frame(ctx) -> bool:
         if is_rp_prompt(body):
             career.tt_last_action_at = now
             _decline_rp_restore(ctx)
+            return True
+        if 'tp' in body.lower():
+            # The TP prompt, left over from a career that could not start. It
+            # is modal, so nothing here can proceed until it is gone - and
+            # spending on TP is never this session's business.
+            career.tt_last_action_at = now
+            log.info("Team trials: clearing the TP restore prompt")
+            ctx.ctrl.click_by_point(RESTORE_NO)
+            time.sleep(1)
             return True
     for name, point in TITLE_RULES:
         if title and find_similar_text(title, [name], 0.8) == name:

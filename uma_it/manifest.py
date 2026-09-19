@@ -217,6 +217,12 @@ def exec_script(ctx):
         return
     table = script_dicts.get(ctx.task.task_type)
     if table and ctx.current_ui in table:
+        # A screen with a handler means the bot is somewhere it knows, so the
+        # run of unrecognised frames is over - see script_not_found_ui, which
+        # presses Home once that run gets long.
+        career = getattr(ctx, 'career', None)
+        if career is not None and ctx.current_ui is not NOT_FOUND_UI:
+            career.unknown_frames = 0
         table[ctx.current_ui](ctx)
         return
     name = getattr(ctx.current_ui, 'ui_name', ctx.current_ui)

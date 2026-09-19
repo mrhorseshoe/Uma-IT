@@ -76,9 +76,16 @@ TT_BACK = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinat
 # then "To Home" - which is matched, never clicked blind, because "Give Up"
 # sits beside it and would throw the career away.
 IT_MENU = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(644, 1231), "Independent Training - menu", None)
-# "Not enough RP. Do you want to restore RP?" - the real end of a session on
-# this version of the game. No, every time: RP is not worth carats.
-RP_RESTORE_NO = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(202, 834), "Not enough RP - decline", None)
+# "No" on both restore prompts - the RP one that ends a team trials session,
+# and the TP one that starts a wait. They share this dialog and this button.
+# Declining is not optional politeness: the prompt is modal, and a run that
+# ends while it is still up leaves the game behind a popup nothing can get
+# past - which is how 19 Sep ended with three RP unspent and a bot that looked
+# asleep.
+RESTORE_NO = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(202, 834), "Restore prompt - No", None)
+# The bottom navigation's Home tab, present on every screen outside a career.
+# The way back to something the bot knows.
+HOME_TAB = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(360, 1228), "Bottom nav - Home", None)
 
 # --- dialogs that only script_info handled in the parent ------------------
 # Not reachable from any screen definition, which is why they arrive after the

@@ -136,10 +136,10 @@ real_title, real_ocr = tt._read_title, tt.ocr_line
 tt._read_title = lambda _ctx, _img: 'Confirm'
 tt.ocr_line = lambda _crop: "Not enough RP. Do you want to restore RP?"
 tt.run_frame(ctx)
-check("it declines the restore", ctx.ctrl.clicks == [NAME(P.RP_RESTORE_NO)],
+check("it declines the restore", ctx.ctrl.clicks == [NAME(P.RESTORE_NO)],
       str(ctx.ctrl.clicks))
-check("  and ends the session as out of RP",
-      [r for _, r in ctx.ended] == [EndTaskReason.TEAM_TRIALS_DONE], str(ctx.ended))
+check("  and the session is on its way home",
+      ctx.career.tt_returning is True, str(ctx.career.tt_returning))
 check("  recording when RP ran out", ctx.task.detail.tt_last_empty_at > 0,
       str(ctx.task.detail.tt_last_empty_at))
 # Put the real readers back: with every frame reading as an RP prompt, the
@@ -154,7 +154,7 @@ dialogs.read_title = lambda _ctx: 'Confirm'
 dialogs.read_body = lambda _ctx, _hdr: "Not enough RP. Do you want to restore RP?"
 dialogs.script_dialog(ctx)
 check("the router declines an RP prompt without waiting for TP",
-      ctx.ctrl.clicks == [NAME(P.RP_RESTORE_NO)], str(ctx.ctrl.clicks))
+      ctx.ctrl.clicks == [NAME(P.RESTORE_NO)], str(ctx.ctrl.clicks))
 check("  and does not end the run", ctx.ended == [], str(ctx.ended))
 check("  nor hold the loop", (ctx.task.detail.resume_after or 0) == 0,
       str(ctx.task.detail.resume_after))
@@ -173,17 +173,42 @@ for template in (T.REF_TT_CANT, T.REF_TT_CANT_2):
     tt.run_frame(ctx)
     check("it leaves the screen", ctx.ctrl.clicks == [NAME(P.TT_DONE), NAME(P.TT_DONE)],
           str(ctx.ctrl.clicks))
-    check("  and ends the run as team trials, not a career",
+    # Not over yet: the session ends on Home, never on a Race tab screen.
+    check("  and starts walking back to Home", ctx.career.tt_returning is True)
+    check("  without ending the run there", ctx.ended == [], str(ctx.ended))
+    only(T.REF_TT_HOME)
+    tt.run_frame(ctx)
+    check("  the run ends once Home is on screen",
           [r for _, r in ctx.ended] == [EndTaskReason.TEAM_TRIALS_DONE], str(ctx.ended))
-    check("  and stops owing a session", ctx.task.detail.tt_pending is False)
+    check("  and it stops owing a session", ctx.task.detail.tt_pending is False)
+
+# Handing the frames back on a Race tab screen is what cost five hours on
+# 19 Sep: nothing there has a template, so the blind fallback clicked a corner
+# every second, the click guard restarted the game, and the game came back to
+# the same screen. The bot only got out when the daily reset dialog appeared.
+print("\nthe session ends on Home, not wherever it happens to finish")
+ctx = FakeCtx()
+only(T.REF_TT_CANT)
+tt.run_frame(ctx)                       # out of RP -> returning
+tt.image_match = lambda _img, _t: Found(False)
+ctx.ctrl.clicks.clear()
+tt.run_frame(ctx)
+check("it presses Home while nothing is recognised",
+      ctx.ctrl.clicks == [NAME(P.HOME_TAB)], str(ctx.ctrl.clicks))
+check("  and keeps claiming the frames", tt.active(ctx) is True)
+for _ in range(tt.MAX_RETURN_CLICKS + 3):
+    tt.run_frame(ctx)
+check("  but gives up rather than pressing forever",
+      len(ctx.ctrl.clicks) == tt.MAX_RETURN_CLICKS, str(len(ctx.ctrl.clicks)))
+check("  handing back anyway", tt.active(ctx) is False and ctx.career.tt_returning is False)
 
 # Out-of-RP is checked before anything that would start another race: the game
 # shows both on the same frame, and paying for a race it cannot afford leaves
 # the flow somewhere nobody has studied.
+order = [t for _, t, _ in tt.RULES]
 check("out of RP is matched before the race buttons",
-      [t for t, _ in tt.RULES].index(T.REF_TT_CANT) == 0
-      and [t for t, _ in tt.RULES].index(T.REF_TT_TEAM_RACE) > 1,
-      str([getattr(t, 'template_name', t) for t, _ in tt.RULES][:4]))
+      order.index(T.REF_TT_CANT) == 0 and order.index(T.REF_TT_TEAM_RACE) > 1,
+      str([n for n, _, _ in tt.RULES][:4]))
 
 print("\nevery frame is claimed, matched or not")
 # The career handlers must never act on these screens - the bot is on the Race
@@ -227,9 +252,13 @@ tt.run_frame(ctx)
 ctx.career.tt_raced = True
 ctx.career.tt_last_action_at = time.time() - tt.QUIET_LIMIT_SECONDS - 1
 tt.run_frame(ctx)
-check("quiet for longer than a race ends it",
-      [r for _, r in ctx.ended] == [EndTaskReason.TEAM_TRIALS_DONE], str(ctx.ended))
+check("quiet for longer than a race ends it", ctx.career.tt_returning is True,
+      str(ctx.career.tt_returning))
 check("  having clicked nothing", ctx.ctrl.clicks == [], str(ctx.ctrl.clicks))
+only(T.REF_TT_HOME)
+tt.run_frame(ctx)
+check("  and the run ends back on Home",
+      [r for _, r in ctx.ended] == [EndTaskReason.TEAM_TRIALS_DONE], str(ctx.ended))
 
 ctx = FakeCtx()
 tt.image_match = lambda _img, _t: Found(False)
@@ -237,7 +266,11 @@ tt.run_frame(ctx)
 ctx.career.tt_started_at = time.time() - tt.SESSION_LIMIT_SECONDS - 1
 ctx.career.tt_last_action_at = time.time()
 tt.run_frame(ctx)
-check("a session that runs long ends too",
+check("a session that runs long ends too", ctx.career.tt_returning is True,
+      str(ctx.career.tt_returning))
+only(T.REF_TT_HOME)
+tt.run_frame(ctx)
+check("  once it is back on Home",
       [r for _, r in ctx.ended] == [EndTaskReason.TEAM_TRIALS_DONE], str(ctx.ended))
 
 print("\nthe career countdown is the cheapest RP in the loop")
@@ -294,6 +327,8 @@ only(T.REF_TT_CANT)
 tt.run_frame(ctx)
 check("out of RP leaves the Race tab", ctx.ctrl.clicks == [NAME(P.TT_DONE), NAME(P.TT_DONE)],
       str(ctx.ctrl.clicks))
+only(T.REF_TT_HOME)
+tt.run_frame(ctx)
 check("  the run is not ended - the career is still going", ctx.ended == [], str(ctx.ended))
 check("  the session is over", ctx.career.tt_active is False and tt.active(ctx) is False)
 check("  and RP is not asked about again straight away", tt.due(ctx) is False)
@@ -304,6 +339,10 @@ dialogs_ctx.task.detail.tt_pending = False
 dialogs._wait_for_tp(dialogs_ctx, "You need 2 more TP to start a Career Scenario.", "test")
 check("the wait asks for a session when the task wants one",
       dialogs_ctx.task.detail.tt_pending is True)
+# The prompt is modal. Left up it blocks the very session the wait just asked
+# for: on 19 Sep the bot sat behind one with three RP unspent, looking asleep.
+check("  and the prompt is dismissed, not left on screen",
+      NAME(P.RESTORE_NO) in dialogs_ctx.ctrl.clicks, str(dialogs_ctx.ctrl.clicks))
 
 # ... but not one that would walk to the Race tab to be told RP is empty,
 # which is what happened at 07:34 on 19 Sep, minutes after a session.
