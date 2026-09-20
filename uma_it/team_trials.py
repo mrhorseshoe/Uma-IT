@@ -1,12 +1,22 @@
-"""Team trials, run in the gaps between careers.
+"""Team trials, run between careers.
 
 Independent Training costs 30 TP, and TP comes back at 1 per 10 minutes, so a
 loop that keeps up with itself spends most of the day waiting. Team trials
 spend **RP** instead - one per race, one back every 90 minutes, capped at 5 -
-which this app has no other use for and which stops accruing once it caps. So
-the wait is where they belong: never ahead of a career, only while one cannot
-start. `tp_pending` on the task says a session is owed; the scheduler starts
-the task for it, and the TP wait resumes when the RP runs out.
+which this app has no other use for and which stops accruing once it caps.
+
+A session runs **between careers, never inside one**: the loop spends whatever
+RP has built up, and only then starts the next career. There used to be a
+second path that left a running career on its countdown to spend RP mid-run.
+It worked, but at 90 minutes a point RP simply does not build up fast enough
+for a career-length gap to be worth interrupting anything for, and it was the
+half of this module with all the sharp edges - a way out of the countdown
+screen, a way back in, and career state that had to survive both.
+
+`tt_pending` on the task says a session is owed. It is set before a career
+starts and by a TP wait, both of which are the loop standing still; the
+scheduler starts the task for it, and whatever was holding the loop back is
+still holding it when the RP runs out.
 
 The flow is the parent project's, ported: an ordered list of "if this crop is
 on screen, click there". Every template and coordinate is moved verbatim from
@@ -39,7 +49,6 @@ from bot.recog.ocr import ocr_line, find_similar_text
 
 from uma_it.asset.point import (
     HOME_TAB,
-    IT_MENU,
     RESTORE_NO,
     TT_BACK,
     TT_DONE,
@@ -64,7 +73,7 @@ from uma_it.asset.template import (
     REF_TT_SELECT_OPPONENT,
     REF_TT_TEAM_RACE,
     REF_TT_TEAM_TRIALS,
-    REF_TT_TO_HOME,
+    UI_INDEPENDENT_TRAINING_WAIT,
     UI_INFO,
 )
 from uma_it.task import EndTaskReason
@@ -89,24 +98,20 @@ SESSION_LIMIT_SECONDS = 1500
 # RP comes back one point every 90 minutes and caps at 5, so there is no sense
 # looking more often than that - and a session always runs RP to zero, so the
 # clock starts when it does. A little under 90 so it does not drift past the
-# point where a career could have used the time.
+# point where a career could have used the time. A career is about 50 minutes,
+# so in practice this is a session every second loop, which is the rate RP
+# accrues at anyway.
 RP_RETRY_SECONDS = 85 * 60
-# Not worth leaving a career that is nearly done: the results flow would wait
-# on the bot, and the RP will still be there in a few minutes.
-MIN_CAREER_MINUTES_LEFT = 8
 
 
 def active(ctx) -> bool:
-    """True while a team trials session is running or owed.
+    """True while a team trials session is owed or running.
 
-    Two ways in. `tt_pending` on the task is a session owed across a restart -
-    a TP wait asked for one. `tt_active` on the run context is a session
-    running inside a career, where the bot leaves the countdown, spends its RP
-    and comes back; that one must not survive a restart, because the career it
-    belongs to does not.
+    One way in: `tt_pending` on the task, which is durable, because the
+    process soft-restarts between runs and a session that lost its flag would
+    hand the frames straight back to the career handlers.
     """
-    return bool(getattr(getattr(ctx, 'career', None), 'tt_active', False)
-                or getattr(_detail(ctx), 'tt_pending', False))
+    return bool(getattr(_detail(ctx), 'tt_pending', False))
 
 
 def _detail(ctx):
@@ -121,32 +126,25 @@ def wanted(ctx) -> bool:
 
 
 def due(ctx) -> bool:
-    """True when RP has had time to build up since the last session.
+    """True when RP has had time to build up since the last session."""
+    return due_for(_detail(ctx))
+
+
+def due_for(detail) -> bool:
+    """Same, from the task's settings alone.
+
+    Taken apart from `due` so `UmaItTask.start_task` can ask before a career
+    without building a context to ask with.
 
     The game is the authority on how much RP there is - a session ends when it
-    says there is none - so this only decides when it is worth asking.
+    says there is none - so this only decides when it is worth walking to the
+    Race tab to find out. Without it the loop would make that trip before
+    every career, and most of them would be told there is no RP.
     """
-    if not wanted(ctx):
+    if not bool(getattr(detail, 'team_trials_while_waiting', False)):
         return False
-    last = getattr(_detail(ctx), 'tt_last_empty_at', 0) or 0
+    last = getattr(detail, 'tt_last_empty_at', 0) or 0
     return time.time() - last >= RP_RETRY_SECONDS
-
-
-def begin_in_career(ctx):
-    """Leave the countdown to spend RP, and come back to it afterwards.
-
-    An Independent Training career runs in real time for about fifty minutes
-    and the game does not need the bot present for any of it, so this is the
-    cheapest RP in the loop. Nothing is clicked here: setting the flag hands
-    the next frame to `run_frame`, and this handler must not click.
-    """
-    career = ctx.career
-    career.tt_active = True
-    career.tt_from_career = True
-    career.tt_started_at = 0.0
-    career.tt_back_clicks = 0
-    career.tt_raced = False
-    log.info("🏁 Career is running itself - going to spend RP on team trials")
 
 
 def _next_sequence(ctx):
@@ -192,24 +190,47 @@ def _finish(ctx, why: str):
         _save_debug(ctx, "unrecognised")
 
 
+def _stand_down(ctx, why: str):
+    """Drop the session without ending the run, and let the frame fall through.
+
+    The one case this exists for: a run begins with a career already pending
+    in-game - after a watchdog restart, say - so the first screen the session
+    sees is the countdown. A session must never interrupt a running career, and
+    it cannot walk out of that screen either (the countdown has no Back and no
+    bottom nav), so the only right answer is to stop being a session. The
+    career handlers take the frame, the career finishes, and the RP is still
+    there for the next loop.
+    """
+    career = ctx.career
+    career.tt_started_at = 0.0
+    career.tt_last_action_at = 0.0
+    career.tt_back_clicks = 0
+    career.tt_return_clicks = 0
+    career.tt_returning = False
+    career.tt_raced = False
+    ctx.task.detail.tt_pending = False
+    log.info(f"🏁 Team trials stood down ({why}) - the RP keeps until next time")
+
+
 def _hand_back(ctx, why: str):
-    """Home is on screen: give the frames back to the ordinary handlers."""
+    """Home is on screen: the session is over, and so is this run.
+
+    Ending the run rather than carrying on from Home is what makes the session
+    a thing that happens *between* careers. The scheduler starts the task again
+    immediately; `tt_pending` is clear by then, so that start is the career -
+    unless a TP wait is still outstanding, which `start_task` leaves standing.
+    """
     career = ctx.career
     detail = ctx.task.detail
     reason = getattr(career, 'tt_finish_reason', '') or 'done'
-    career.tt_active = False
     career.tt_returning = False
-    career.tt_from_career = False
     career.tt_started_at = 0.0
     career.tt_back_clicks = 0
     career.tt_return_clicks = 0
     career.tt_raced = False
-    if detail.tt_pending:
-        detail.tt_pending = False
-        log.info(f"🏁 Team trials over ({reason}; {why})")
-        ctx.task.end_task(TaskStatus.TASK_STATUS_FAILED, EndTaskReason.TEAM_TRIALS_DONE)
-        return
-    log.info(f"🏁 Team trials over ({reason}; {why}) - back to the career")
+    detail.tt_pending = False
+    log.info(f"🏁 Team trials over ({reason}; {why})")
+    ctx.task.end_task(TaskStatus.TASK_STATUS_FAILED, EndTaskReason.TEAM_TRIALS_DONE)
 
 
 def _save_debug(ctx, tag: str):
@@ -220,21 +241,6 @@ def _save_debug(ctx, tag: str):
                     ctx.ctrl.get_screen())
     except Exception as e:
         log.debug(f"team trials capture failed: {e}")
-
-
-def _to_home(ctx):
-    """"To Home" on the countdown screen's menu, clicked where it was found.
-
-    Never a fixed point: "Give Up" sits beside it on the same dialog and
-    abandons the career. Matching the button is what keeps a stray coordinate
-    from costing a run.
-    """
-    img = ctx.ctrl.get_screen(to_gray=True)
-    found = image_match(img, REF_TT_TO_HOME)
-    if not found.find_match:
-        return
-    log.info("Team trials: leaving the career to its countdown (To Home)")
-    ctx.ctrl.click(found.center_point[0], found.center_point[1], "Team trials - To Home")
 
 
 def _out_of_rp(ctx):
@@ -279,7 +285,6 @@ def is_rp_prompt(body: str) -> bool:
 RULES = [
     ("no RP left", REF_TT_CANT, _out_of_rp),
     ("no RP left (2)", REF_TT_CANT_2, _out_of_rp),
-    ("the training menu", REF_TT_TO_HOME, _to_home),
     ("Home", REF_TT_HOME, TT_RACE_TAB),
     ("the Race tab", REF_TT_TEAM_TRIALS, TT_TEAM_TRIALS),
     ("Team Trials", REF_TT_TEAM_RACE, TT_TEAM_RACE),
@@ -316,19 +321,32 @@ TITLE_RULES = [("Items Selected", TT_ITEMS_SELECTED_OK),
 def run_frame(ctx) -> bool:
     """Drive one frame of a team trials session. True once it has claimed it.
 
-    Always True while a session is live, even on a frame nothing matched: the
-    career handlers must not act on these screens.
+    True on every frame while a session is live, even one nothing matched: the
+    career handlers must not act on these screens. The single exception is a
+    session that stands down - see `_stand_down` - which hands the frame back
+    by returning False.
     """
     career = ctx.career
     now = time.time()
+    img = ctx.ctrl.get_screen(to_gray=True)
+
+    # Never interrupt a career. A session has no way off the countdown screen
+    # anyway - no Back, no bottom nav - so one that started in front of one
+    # would click at it until the quiet limit and hand back having done
+    # nothing. Checked only before the session has raced: afterwards this
+    # screen cannot be what is on show.
+    if not getattr(career, 'tt_raced', False) and not getattr(career, 'tt_returning', False):
+        try:
+            if image_match(img, UI_INDEPENDENT_TRAINING_WAIT).find_match:
+                _stand_down(ctx, "a career is already running")
+                return False
+        except Exception as e:
+            log.debug(f"team trials: countdown check failed: {e}")
+
     if not getattr(career, 'tt_started_at', 0):
         career.tt_started_at = now
         career.tt_last_action_at = now
-        where = "while the career runs itself" if getattr(career, 'tt_from_career', False) \
-            else "while the loop waits for TP"
-        log.info(f"🏁 Team trials: spending RP {where}")
-
-    img = ctx.ctrl.get_screen(to_gray=True)
+        log.info("🏁 Team trials: spending RP before the next career")
 
     # Walking back to Home after the session ended. Bounded: if the Home tab
     # does not get there, hand back anyway rather than click on forever.
@@ -407,16 +425,11 @@ def run_frame(ctx) -> bool:
         if backs < MAX_BACK_CLICKS:
             career.tt_back_clicks = backs + 1
             career.tt_last_action_at = now
-            # Two ways out, by where the session began. A career sits on the
-            # countdown, which has no Back at all - only the menu, and then the
-            # matched "To Home" above. A TP wait leaves the bot on the career
-            # start screens, which do.
-            if getattr(career, 'tt_from_career', False):
-                log.info(f"Team trials: opening the training menu ({backs + 1})")
-                ctx.ctrl.click_by_point(IT_MENU)
-            else:
-                log.info(f"Team trials: not on Home yet - backing out ({backs + 1})")
-                ctx.ctrl.click_by_point(TT_BACK)
+            # A session begins wherever the loop was standing still - Home
+            # after a finished career, or the career start screens when a
+            # declined TP prompt left the bot there. Back walks out of both.
+            log.info(f"Team trials: not on Home yet - backing out ({backs + 1})")
+            ctx.ctrl.click_by_point(TT_BACK)
             return True
     if quiet > QUIET_LIMIT_SECONDS:
         _finish(ctx, f"nothing recognised for {round(quiet / 60)} min")

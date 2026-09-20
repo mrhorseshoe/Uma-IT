@@ -101,24 +101,17 @@ check("the results Next is clicked where it was found, then confirmed",
       ctx.ctrl.clicks == [(300, 900, "Team trials - Next"), NAME(P.TT_NEXT_AFTER)],
       str(ctx.ctrl.clicks))
 
-# The countdown screen has no Back button: its menu holds "To Home" and, three
-# hundred pixels to the right, "Give Up", which abandons the career. So this
-# one is matched and clicked where it was found, never at a fixed point.
-ctx = FakeCtx()
-only(T.REF_TT_TO_HOME)
-tt.run_frame(ctx)
-check("To Home is clicked where it was found, not at a coordinate",
-      ctx.ctrl.clicks == [(300, 900, "Team trials - To Home")], str(ctx.ctrl.clicks))
-
+# A session begins wherever the loop was standing still - Home, or the career
+# start screens a declined TP prompt left the bot on. Back walks out of both,
+# and it is bounded: one point clicked over and over is what the repetitive
+# click guard restarts the game over.
 ctx = FakeCtx(team_trials_while_waiting=True)
-ctx.task.detail.tt_pending = False
-tt.begin_in_career(ctx)
 tt.image_match = lambda _img, _t: Found(False)
 tt.run_frame(ctx)
 ctx.career.tt_last_action_at = time.time() - tt.BACK_OUT_AFTER_SECONDS - 1
 tt.run_frame(ctx)
-check("a session inside a career opens the training menu instead of Back",
-      ctx.ctrl.clicks == [NAME(P.IT_MENU)], str(ctx.ctrl.clicks))
+check("a session that is not on Home yet backs out towards it",
+      ctx.ctrl.clicks == [NAME(P.TT_BACK)], str(ctx.ctrl.clicks))
 
 # Measured 19 Sep: the parent's "no RP" crop never matched on this version of
 # the game. What actually appears is a Confirm dialog offering to restore RP,
@@ -297,9 +290,13 @@ tt.run_frame(ctx)
 check("  once it is back on Home",
       [r for _, r in ctx.ended] == [EndTaskReason.TEAM_TRIALS_DONE], str(ctx.ended))
 
-print("\nthe career countdown is the cheapest RP in the loop")
-# Fifty of a career's fifty-two minutes are a countdown the game runs without
-# the bot, while RP builds up at a point every ninety minutes and caps at 5.
+print("\nRP is spent between careers, never inside one")
+# There used to be a second path here: the countdown handler handed a running
+# career over to a session, which spent its RP and walked back in. RP accrues
+# at a point every ninety minutes, which is too slow for a career-length gap
+# to be worth interrupting, and that path owned every sharp edge in this
+# module - the way out of the countdown, the way back, and career state that
+# had to survive both. What is pinned now is that the countdown does nothing.
 import uma_it.career as career_mod
 career_mod.time.sleep = lambda *_: None
 
@@ -321,40 +318,79 @@ def wait_frame(remaining, **settings):
     return ctx
 
 
-ctx = wait_frame("0:49:30 left", team_trials_while_waiting=True)
-check("the countdown hands over to a session", ctx.career.tt_active is True)
-check("  without clicking anything, as that handler must not",
-      ctx.ctrl.clicks == [], str(ctx.ctrl.clicks))
-check("  and a session in a career claims frames",
-      tt.active(ctx) is True)
+for label, remaining in (("a long countdown", "0:49:30 left"),
+                         ("one nearly done", "0:03:10 left"),
+                         ("an unreadable one", "")):
+    ctx = wait_frame(remaining, team_trials_while_waiting=True)
+    check(f"{label} clicks nothing and starts nothing",
+          ctx.ctrl.clicks == [] and tt.active(ctx) is False,
+          str((ctx.ctrl.clicks, tt.active(ctx))))
 
-ctx = wait_frame("0:03:10 left", team_trials_while_waiting=True)
-check("a career nearly done is left alone", ctx.career.tt_active is False)
-ctx = wait_frame("", team_trials_while_waiting=True)
-check("  and so is a countdown that could not be read",
-      ctx.career.tt_active is False)
-ctx = wait_frame("0:49:30 left")
-check("  and nothing happens when the task did not ask",
-      ctx.career.tt_active is False)
+# The run that spends the RP is a run of its own, started before the career.
+# The one way a session can find itself in front of a running career: the run
+# began with a career pending in-game, which is what a watchdog restart leaves
+# behind. It must not interrupt it, and it could not walk out of that screen
+# if it tried - the countdown has no Back and no bottom nav.
+print("\na session in front of a running career stands down")
+ctx = FakeCtx(team_trials_while_waiting=True)
+only(T.UI_INDEPENDENT_TRAINING_WAIT)
+claimed = tt.run_frame(ctx)
+check("it hands the frame back rather than claiming it", claimed is False, str(claimed))
+check("  clicking nothing at the career", ctx.ctrl.clicks == [], str(ctx.ctrl.clicks))
+check("  and stops owing a session", ctx.task.detail.tt_pending is False)
+check("  without ending the run", ctx.ended == [], str(ctx.ended))
+check("  and without marking the RP spent, so the next loop tries again",
+      tt.due(ctx) is True)
 
-check("the countdown is read in minutes",
-      (career_mod.minutes_left("0:49:30 left"), career_mod.minutes_left("1:02:00"),
-       career_mod.minutes_left("")) == (49, 62, None),
-      str((career_mod.minutes_left("0:49:30 left"), career_mod.minutes_left("1:02:00"),
-           career_mod.minutes_left(""))))
-
-print("\na session inside a career goes back to the career, not the loop")
+print("\na session is a run of its own, started before the career")
 ctx = FakeCtx(team_trials_while_waiting=True)
 ctx.task.detail.tt_pending = False
-tt.begin_in_career(ctx)
+ctx.task.detail.tt_last_empty_at = 0
+ctx.task.start_task()
+check("the loop start claims the run for a session",
+      ctx.task.detail.tt_pending is True, str(ctx.task.detail.tt_pending))
+
+ctx2 = FakeCtx(team_trials_while_waiting=True)
+ctx2.task.detail.tt_pending = False
+ctx2.task.detail.tt_last_empty_at = int(time.time())
+ctx2.task.start_task()
+check("  and starts the career when RP has not come back yet",
+      ctx2.task.detail.tt_pending is False, str(ctx2.task.detail.tt_pending))
+
+ctx3 = FakeCtx()
+ctx3.task.detail.tt_pending = False
+ctx3.task.detail.tt_last_empty_at = 0
+ctx3.task.start_task()
+check("  and never when the task did not ask for team trials",
+      ctx3.task.detail.tt_pending is False, str(ctx3.task.detail.tt_pending))
+
+# A TP wait that cleared itself here would send the bot at a career the game
+# is about to refuse - and the refusal starts the wait over from the top.
+ctx4 = FakeCtx(team_trials_while_waiting=True)
+ctx4.task.detail.tt_pending = True
+ctx4.task.detail.resume_after = int(time.time()) + 1800
+ctx4.task.start_task()
+check("a session does not cancel the TP wait behind it",
+      ctx4.task.detail.resume_after > 0, str(ctx4.task.detail.resume_after))
+ctx5 = FakeCtx(team_trials_while_waiting=True)
+ctx5.task.detail.tt_pending = False
+ctx5.task.detail.tt_last_empty_at = int(time.time())
+ctx5.task.detail.resume_after = int(time.time()) + 1800
+ctx5.task.start_task()
+check("  but a career start does", ctx5.task.detail.resume_after == 0,
+      str(ctx5.task.detail.resume_after))
+
+print("\nthe session ends the run, so the career is the next one")
+ctx = FakeCtx(team_trials_while_waiting=True)
 only(T.REF_TT_CANT)
 tt.run_frame(ctx)
 check("out of RP leaves the Race tab", ctx.ctrl.clicks == [NAME(P.TT_DONE), NAME(P.TT_DONE)],
       str(ctx.ctrl.clicks))
 only(T.REF_TT_HOME)
 tt.run_frame(ctx)
-check("  the run is not ended - the career is still going", ctx.ended == [], str(ctx.ended))
-check("  the session is over", ctx.career.tt_active is False and tt.active(ctx) is False)
+check("  the run ends once Home is back",
+      [r for _, r in ctx.ended] == [EndTaskReason.TEAM_TRIALS_DONE], str(ctx.ended))
+check("  the session is no longer owed", tt.active(ctx) is False)
 check("  and RP is not asked about again straight away", tt.due(ctx) is False)
 
 print("\na TP wait is what schedules a session")

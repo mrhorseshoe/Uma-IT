@@ -160,7 +160,7 @@ class TaskDetail:
 class EndTaskReason(Enum):
     TP_NOT_ENOUGH = "Not enough TP to start a run"
     TP_WAIT = "Waiting for TP to regenerate"
-    TEAM_TRIALS_DONE = "Team trials finished; back to waiting for TP"
+    TEAM_TRIALS_DONE = "Team trials finished; on to the next career"
     STOP_AT_SPARK_REROLL = "Stopped at the spark reroll screen"
 
 
@@ -251,10 +251,36 @@ class UmaItTask(Task):
         super().end_task(status, reason)
 
     def start_task(self) -> None:
-        # A run is starting, so whatever TP wait was outstanding is over.
+        """Decide what this run is before it begins: a session, or a career.
+
+        Team trials go here because "before a new loop" is exactly this point,
+        and because the flag has to be set before the first frame is
+        dispatched - the manifest hands every frame to the session while it is
+        set, and Home is where the session needs to start from.
+        """
         detail = getattr(self, 'detail', None)
-        if detail is not None:
-            detail.resume_after = 0
+        if detail is None:
+            super().start_task()
+            return
+        if getattr(detail, 'tt_pending', False):
+            # This run *is* the session, so whatever was holding the loop back
+            # still holds: a TP wait that cleared itself here would send the
+            # bot at a career the game is about to refuse, and the refusal
+            # starts the wait over.
+            log.info("Starting a team trials session before the next career")
+            super().start_task()
+            return
+        # A run is starting, so whatever TP wait was outstanding is over.
+        detail.resume_after = 0
+        try:
+            from uma_it import team_trials
+            if team_trials.due_for(detail):
+                # Spend the RP first. The session ends by ending this run; the
+                # scheduler comes straight back, and by then this is false.
+                detail.tt_pending = True
+        except Exception as e:
+            # A career must start even if this cannot be decided.
+            log.warning("Could not check whether team trials are due: %s" % e)
         super().start_task()
 
 

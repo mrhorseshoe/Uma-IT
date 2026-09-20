@@ -57,6 +57,13 @@ below it, and when neither roll qualifies it keeps the set with more sparks.
 **Restores TP** from a TP item when you hold one, carats otherwise, and never
 spends a chocolate item. One switch governs all spending.
 
+**Spends spare RP on team trials.** Optional, and it runs between careers: at
+the start of a loop, and during a wait for TP, the bot races team trials until
+the game says there is no RP left, then starts the career. RP regenerates at a
+point every 90 minutes and caps at 5, so it is checked at most every 85
+minutes - which works out to about one session per two careers - and nothing
+interrupts a career that is already running.
+
 **Keeps its own data current.** One **Update data** button reads the game's
 `master.mdb` and refreshes both the skill list and the spark vocabulary, and the
 dashboard says which game version they are current to.

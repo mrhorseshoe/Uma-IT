@@ -414,7 +414,7 @@ pre#log {
 
     <div class="field">
       <label for="teamtrials">Run team trials with spare RP
-        <span class="hint">While a career runs itself and while waiting for TP. Spends RP, which nothing else here uses and which stops building up once it caps at 5.</span>
+        <span class="hint">Before each career, and while waiting for TP. Spends RP, which nothing else here uses and which stops building up once it caps at 5.</span>
       </label>
       <span class="switch"><input type="checkbox" id="teamtrials"><span></span></span>
     </div>
@@ -999,7 +999,8 @@ function render(status, state) {
 
   $("state").textContent = finished
     ? "Done"
-    : waiting ? (d.tt_pending ? "Team trials" : "Waiting for TP")
+    : d && d.tt_pending && running ? "Team trials"
+    : waiting ? "Waiting for TP"
     : running ? (it.active ? "Training" : "Running")
     : status.status === "stopped" ? "Stopped" : status.status;
 
@@ -1062,7 +1063,7 @@ function renderTask() {
     ["Legacy", d.use_last_parents ? "keep last" : "auto-select"],
     ["Skills", d.skip_learn_skill ? "skipped" : "requested"],
     ["TP", d.allow_recover_tp ? "may spend" : "never spend"],
-    ["Team trials", d.team_trials_while_waiting ? "with spare RP" : "off"],
+    ["Team trials", d.team_trials_while_waiting ? "before each career" : "off"],
     ...(d.skip_learn_skill ? [] : [["Priorities", tierSummary(d)]]),
     ...(d.spark_reroll_enabled ? [["Reroll", sparkSummary(d)]] : []),
   ].map(([k, v]) => `<div><span class="k">${k}</span> ${v}</div>`).join("");
