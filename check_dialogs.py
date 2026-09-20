@@ -81,6 +81,39 @@ for title in ('Perks', 'Borrow Card', 'Follow Trainer', 'Notices'):
     check(f"{title!r} makes exactly the fallback's click",
           ctx.ctrl.clicks == [NAME(ESCAPE)], str(ctx.ctrl.clicks))
 
+# The shop offer that stopped a team trials session on 20 Sep: nothing matched
+# it, the session clicked nothing, and the screen sat still until the watchdog
+# restarted the game. The user's rule is Cancel, always - so what is pinned
+# here is that it never confirms, on any of the shapes the dialog can take.
+print("\nthe Daily Sale offer is always declined")
+green = dialogs.find_green_button
+try:
+    dialogs.find_green_button = lambda *_a: (498, 906)
+    ctx = route('Daily Sale')
+    check("Cancel is the mirror of the green button",
+          ctx.ctrl.clicks == [(222, 906, "Daily Sale - Cancel")], str(ctx.ctrl.clicks))
+
+    # A single centred button is its own mirror, so mirroring it would click
+    # the purchase it is meant to decline. Clear the popup instead.
+    dialogs.find_green_button = lambda *_a: (362, 906)
+    ctx = route('Daily Sale')
+    check("a lone centred button is never mirrored into itself",
+          ctx.ctrl.clicks == [NAME(ESCAPE)], str(ctx.ctrl.clicks))
+
+    dialogs.find_green_button = lambda *_a: None
+    ctx = route('Daily Sale')
+    check("  and a popup with no green button is cleared, not left up",
+          ctx.ctrl.clicks == [NAME(ESCAPE)], str(ctx.ctrl.clicks))
+
+    dialogs.find_green_button = lambda *_a: (_ for _ in ()).throw(RuntimeError("boom"))
+    ctx = route('Daily Sale')
+    check("  and a failed search does not leave the bot sitting on it",
+          ctx.ctrl.clicks == [NAME(ESCAPE)], str(ctx.ctrl.clicks))
+finally:
+    # Restoring matters: a leaked patch here silently rewrote later checks
+    # twice while this suite was being written.
+    dialogs.find_green_button = green
+
 print("\nending a career")
 ctx = route('Career Complete')
 check("'Career Complete' cancels the return prompt",

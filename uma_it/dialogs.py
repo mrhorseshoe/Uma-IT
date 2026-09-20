@@ -43,7 +43,7 @@ import bot.base.log as logger
 from uma_it import agenda, spark, start, team_trials, tp
 from uma_it.asset.template import UI_INFO, REF_NEXT
 from uma_it.asset.dialog_titles import ALL_TITLES
-from uma_it.parse import is_spark_selection_screen
+from uma_it.parse import find_green_button, is_spark_selection_screen
 from uma_it.asset.point import (
     EXIT_WITHOUT_LEARNING_SKILLS_OK,
     ESCAPE,
@@ -249,6 +249,47 @@ def _wait_for_tp(ctx, body: str, why: str):
     ctx.task.end_task(TaskStatus.TASK_STATUS_FAILED, EndTaskReason.TP_WAIT)
 
 
+# How far off centre the green button has to sit before the dialog is read as
+# a two-button one. A single centred button is its own mirror, so mirroring it
+# would click the very thing being declined.
+TWO_BUTTON_OFFSET = 60
+
+
+def decline_daily_sale(ctx):
+    """Cancel the shop's Daily Sale offer, wherever it appears.
+
+    Cancel rather than the corner click the parent project makes at (0, 0): a
+    tap outside is a dismissal the dialog may or may not honour, and this one
+    is stubborn. On 20 Sep it landed during a team trials session, nothing
+    recognised it, and the screen sat still long enough for the watchdog to
+    restart the game.
+
+    The button is found, not hardcoded. Cancel is the white button mirroring
+    the green purchase one, so the green one's position gives it - the trick
+    `spark.intercept_dialog` already uses to decline a TP restore, and it holds
+    whatever height the dialog happens to be. A green button near the centre is
+    a *single* button, so there is no Cancel to mirror and the popup is cleared
+    the way the parent clears it.
+    """
+    screen = getattr(ctx, 'current_screen', None)
+    if screen is None:
+        screen = ctx.ctrl.get_screen()
+    career = getattr(ctx, 'career', None)
+    header = getattr(career, 'dialog_header_pos', None)
+    top = header[1][1] if header else 400
+    ok = None
+    try:
+        ok = find_green_button(screen, 70, top, 660, 1270)
+    except Exception as e:
+        log.debug(f"Daily Sale: the green button search failed ({e})")
+    if ok and abs(ok[0] - 360) >= TWO_BUTTON_OFFSET:
+        ctx.ctrl.click(720 - ok[0], ok[1], "Daily Sale - Cancel")
+        time.sleep(1)
+        return
+    where = "no green button found" if not ok else f"one centred button at {ok}"
+    _escape(ctx, f"Daily Sale offer ({where})")
+
+
 def _auto_select(ctx):
     """The legacy/parents picker on the way into a career."""
     if getattr(ctx.task.detail, 'use_last_parents', False):
@@ -273,6 +314,8 @@ DIALOGS = {
     # seconds before a countdown expired and was cleared only because the
     # fallback exists.
     'Notices':          lambda ctx: _escape(ctx, "Daily reset 'Notices' popup"),
+    # The shop's offer of the day. Always declined - the bot spends nothing.
+    'Daily Sale':       decline_daily_sale,
 
     # -- ending a career -----------------------------------------------------
     'Career Complete':      _career_complete,

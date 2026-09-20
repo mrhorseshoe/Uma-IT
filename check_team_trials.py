@@ -210,6 +210,30 @@ check("out of RP is matched before the race buttons",
       order.index(T.REF_TT_CANT) == 0 and order.index(T.REF_TT_TEAM_RACE) > 1,
       str([n for n, _, _ in tt.RULES][:4]))
 
+# 20 Sep: the shop's Daily Sale offer appeared mid-session. No rule matched it,
+# and a session that recognises nothing clicks nothing - so the screen sat
+# still until the 30s watchdog reached three strikes and restarted the game,
+# ninety seconds before the session's own quiet limit would have ended it. The
+# session has to clear this one itself; the router never sees it.
+print("\nthe Daily Sale offer is cleared by the session, not waited out")
+ctx = FakeCtx()
+tt.image_match = lambda _img, _t: Found(False)
+real_title = tt._read_title
+try:
+    tt._read_title = lambda _ctx, _img: 'Daily Sale'
+    import uma_it.dialogs as dialogs_mod
+    green = dialogs_mod.find_green_button
+    try:
+        dialogs_mod.find_green_button = lambda *_a: (498, 906)
+        tt.run_frame(ctx)
+    finally:
+        dialogs_mod.find_green_button = green
+    check("it cancels rather than sitting through it",
+          ctx.ctrl.clicks == [(222, 906, "Daily Sale - Cancel")], str(ctx.ctrl.clicks))
+    check("  and the session stays alive", ctx.ended == [], str(ctx.ended))
+finally:
+    tt._read_title = real_title
+
 print("\nevery frame is claimed, matched or not")
 # The career handlers must never act on these screens - the bot is on the Race
 # tab, where their points mean other things.

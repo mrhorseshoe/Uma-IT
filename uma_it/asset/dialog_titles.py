@@ -28,6 +28,7 @@ OWNED_TITLES = [
     'Borrow Card',
     'Follow Trainer',
     'Notices',
+    'Daily Sale',
     'Career Complete',
     'Complete Career',
     'Training Complete',

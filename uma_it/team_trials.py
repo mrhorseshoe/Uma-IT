@@ -290,10 +290,27 @@ RULES = [
     ("the team result", REF_TT_NEXT_RESULT, TT_NEXT_RESULT),
 ]
 
+def _daily_sale(ctx):
+    """Decline the shop offer, through the router's own handler.
+
+    Imported here rather than at module scope because dialogs.py imports this
+    module; the call is what keeps one implementation of "Cancel" instead of a
+    second copy that drifts.
+    """
+    from uma_it.dialogs import decline_daily_sale
+    decline_daily_sale(ctx)
+
+
 # Dialogs that can land on this path. The router in dialogs.py never sees them
-# during a session - this claims the frame first - so the two that need a click
-# are named here.
-TITLE_RULES = [("Items Selected", TT_ITEMS_SELECTED_OK)]
+# during a session - this claims the frame first - so the ones that need a
+# click are named here. An entry is a fixed point or an action, like RULES.
+#
+# 'Daily Sale' is here because of 20 Sep: it appeared mid-session, no rule
+# matched it, and a session that recognises nothing clicks nothing. The quiet
+# limit would have ended the session after four minutes, but the 30s watchdog
+# reached three strikes at ninety seconds and restarted the game first.
+TITLE_RULES = [("Items Selected", TT_ITEMS_SELECTED_OK),
+               ("Daily Sale", _daily_sale)]
 
 
 def run_frame(ctx) -> bool:
@@ -374,11 +391,14 @@ def run_frame(ctx) -> bool:
             ctx.ctrl.click_by_point(RESTORE_NO)
             time.sleep(1)
             return True
-    for name, point in TITLE_RULES:
+    for name, action in TITLE_RULES:
         if title and find_similar_text(title, [name], 0.8) == name:
             career.tt_last_action_at = now
             log.info(f"Team trials: clearing {name!r}")
-            ctx.ctrl.click_by_point(point)
+            if callable(action):
+                action(ctx)
+            else:
+                ctx.ctrl.click_by_point(action)
             return True
 
     quiet = now - (getattr(career, 'tt_last_action_at', now) or now)
@@ -412,6 +432,12 @@ def _read_title(ctx, img) -> str:
         if not found.find_match:
             return ''
         pos = found.matched_area
+        # Where the header sat, for handlers that bound a search to below it.
+        # dialogs.read_title stashes the same thing; a session never goes
+        # through it, so without this they would search the whole screen.
+        career = getattr(ctx, 'career', None)
+        if career is not None:
+            career.dialog_header_pos = pos
         crop = img[pos[0][1] - 5:pos[1][1] + 5, pos[0][0] + 150:pos[1][0] + 405]
         return (ocr_line(crop) or '').strip()
     except Exception:
