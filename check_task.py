@@ -177,6 +177,27 @@ t9 = build_task(LOOP, 1, "sparks", None, REAL)
 check("a task saved before the field existed restores with no requirement",
       t9.detail.spark_skill_targets == [], str(t9.detail.spark_skill_targets))
 
+# The 3* override is blue-only by design, and the coercion is where that is
+# enforced. A pink name stored here would be a setting that reads as configured
+# on the dashboard and can never fire, because the check only reads blue rows.
+print("\nthe 3* blue override is coerced to blue sparks")
+t9a = build_task(LOOP, 1, "sparks", None,
+                 dict(REAL, spark_keep_3star=['Stamina', 'power']))
+check("blue names are kept, and capitalised the way the page offers them",
+      t9a.detail.spark_keep_3star == ['Stamina', 'Power'],
+      str(t9a.detail.spark_keep_3star))
+t9b = build_task(LOOP, 1, "sparks", None,
+                 dict(REAL, spark_keep_3star=['Turf', 'Nonsense', 'Speed', 'speed']))
+check("  anything that is not a blue spark is dropped, duplicates with it",
+      t9b.detail.spark_keep_3star == ['Speed'], str(t9b.detail.spark_keep_3star))
+t9c = build_task(LOOP, 1, "sparks", None, serialize_umamusume_task(t9a) or {})
+check("  and the list survives the restart",
+      t9c.detail.spark_keep_3star == ['Stamina', 'Power'],
+      str(t9c.detail.spark_keep_3star))
+t9d = build_task(LOOP, 1, "sparks", None, REAL)
+check("a task saved before the field existed restores with no override",
+      t9d.detail.spark_keep_3star == [], str(t9d.detail.spark_keep_3star))
+
 # Being short of TP is not a failed career: the run never started, and TP comes
 # back on its own. Counted as failures, three of them stopped a healthy loop in
 # 25 seconds on 19 Sep - the last attempt was 1 TP short.

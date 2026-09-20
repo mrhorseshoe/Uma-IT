@@ -136,6 +136,14 @@ class TaskDetail:
     # of skills co-occurs in about 2-4% of them while "any of five" lands near
     # 56%, so the arrangement people need most often is the cheap one here.
     spark_skill_targets: list
+    # Blue sparks kept on sight at 3*, whatever the rules above say. Blue 3* is
+    # rare - 6.8% of 281 logged sets hold one at all, ~1.4% for a named stat -
+    # so a roll that has one is worth keeping even when it misses everything
+    # that was actually being farmed for. Checked before the rest of the rule
+    # rather than folded into it: as another target it would still have to
+    # survive the AND with the white requirement rows, which is the opposite
+    # of an override.
+    spark_keep_3star: list[str]
     # Runs whose kept sparks met every requirement, since the loop was last
     # started fresh (Run again clears it with loops_done). Durable for the same
     # reason loops_done is; counted at the spark decision, in `uma_it/spark.py`,
@@ -284,6 +292,25 @@ def _skill_requirement_rows(value):
     return rows
 
 
+def _blue_spark_names(value):
+    """The 3* override list, kept to the five blue sparks.
+
+    Anything else is dropped rather than stored: the override only ever
+    consults blue rows, so a pink or misspelled name saved here would be a
+    setting that reads as configured and can never fire.
+    """
+    from uma_it.parse import SPARK_BLUE_KEYS, SPARK_BLUE_NAMES
+    if not isinstance(value, (list, tuple, set)):
+        return []
+    canonical = {n.lower(): n for n in SPARK_BLUE_NAMES}
+    names = []
+    for item in value:
+        key = str(item or '').strip().lower()
+        if key in SPARK_BLUE_KEYS and canonical[key] not in names:
+            names.append(canonical[key])
+    return names
+
+
 def _int(value, default, low=None, high=None):
     """int(value) with a default, because payloads arrive from JSON and users."""
     try:
@@ -346,6 +373,7 @@ def build_task(task_execute_mode: TaskExecuteMode, task_type: int,
     td.spark_reroll_mode = 'and' if data.get('spark_reroll_mode') == 'and' else 'or'
     td.stop_at_spark_reroll = bool(data.get('stop_at_spark_reroll', False))
     td.spark_skill_targets = _skill_requirement_rows(data.get('spark_skill_targets'))
+    td.spark_keep_3star = _blue_spark_names(data.get('spark_keep_3star'))
     td.spark_goal_runs = _int(data.get('spark_goal_runs'), 0, 0)
 
     task = UmaItTask(app_name=APP_NAME,

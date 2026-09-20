@@ -70,14 +70,17 @@ def _spark_reroll_active(ctx) -> bool:
 
     Either kind of target counts. White requirements on their own are the
     whole point of the feature for parent farming, where the stats and
-    aptitudes do not matter and `spark_reroll_targets` is left empty.
+    aptitudes do not matter and `spark_reroll_targets` is left empty. So does
+    the 3* blue override on its own - it is a list of sparks worth keeping
+    like any other, just one that outranks the rest of the rule.
     """
     detail = ctx.task.detail
     return bool(getattr(detail, 'spark_reroll_enabled', False)) \
         and bool(getattr(detail, 'spark_reroll_targets', None)
-                 or getattr(detail, 'spark_skill_targets', None))
+                 or getattr(detail, 'spark_skill_targets', None)
+                 or getattr(detail, 'spark_keep_3star', None))
 
-def _decide(ctx, rows, targets, mode, min_stars, requirements):
+def _decide(ctx, rows, targets, mode, min_stars, requirements, override=()):
     """Evaluate the keep rule, reading past the fold only if that could change it.
 
     Three reasons this does not simply always scroll. Hidden rows can only add
@@ -86,9 +89,12 @@ def _decide(ctx, rows, targets, mode, min_stars, requirements):
     changed by scrolling. And dragging a list the game flings is the riskiest
     thing here, so it earns its place only when the answer is otherwise "no".
 
+    The 3* blue override needs none of it either: blue always sits in the top
+    three rows, so a set holding one is holding it in view.
+
     Returns (rows_used, hit).
     """
-    hit = spark_rule_check(rows, targets, mode, min_stars, requirements)
+    hit = spark_rule_check(rows, targets, mode, min_stars, requirements, override)
     if hit or not requirements:
         return rows, hit
     try:
@@ -104,7 +110,8 @@ def _decide(ctx, rows, targets, mode, min_stars, requirements):
         return rows, hit
     if len(full) > len(rows):
         log.info(f"🎲 Read {len(full)} sparks in full: {_spark_rows_text(full)}")
-    return full, spark_rule_check(full, targets, mode, min_stars, requirements)
+    return full, spark_rule_check(full, targets, mode, min_stars, requirements,
+                                  override)
 
 
 def _count_goal_met(ctx):
@@ -231,7 +238,9 @@ def script_factor_reroll(ctx):
         min_stars = getattr(detail, 'spark_reroll_min_stars', 3)
         mode = getattr(detail, 'spark_reroll_mode', 'or')
         wanted_skills = getattr(detail, 'spark_skill_targets', []) or []
-        rows, hit = _decide(ctx, rows, targets, mode, min_stars, wanted_skills)
+        keep_3star = getattr(detail, 'spark_keep_3star', []) or []
+        rows, hit = _decide(ctx, rows, targets, mode, min_stars, wanted_skills,
+                            keep_3star)
         # The selection screen's "original" set is this roll, and this read may
         # have gone past the fold; the read made there never does.
         d.spark_roll1_rows = rows
@@ -308,8 +317,9 @@ def handle_spark_selection(ctx):
         rerolled_rows = parse_spark_rows(ctx)
         log.info(f"🎲 Rerolled sparks: {_spark_rows_text(rerolled_rows)}")
         wanted_skills = getattr(detail, 'spark_skill_targets', []) or []
+        keep_3star = getattr(detail, 'spark_keep_3star', []) or []
         rerolled_rows, hit = _decide(ctx, rerolled_rows, targets, mode,
-                                     min_stars, wanted_skills)
+                                     min_stars, wanted_skills, keep_3star)
         if hit:
             choose_rerolled = True
             reason = f"rerolled set has {hit}"

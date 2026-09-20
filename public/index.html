@@ -380,6 +380,18 @@ pre#log {
       <div class="presetbox">
         <button type="button" id="req-add">+ Add requirement</button>
       </div>
+      <!-- The 3★ override. Not another target: it is checked before the
+           rule above and keeps the roll on its own, which is why it is not
+           inside the blue/pink group that the Either/Both switch controls.
+           Blue only, as asked for: over 281 logged sets a blue spark read 3★
+           in 6.8% of them, ~1.4% for a named stat. -->
+      <div class="field">
+        <label>Always keep 3★
+          <span class="hint">Any of these at 3★ keeps the roll, whatever the rules above say</span>
+        </label>
+      </div>
+      <div class="sparks" id="keep3"></div>
+
       <div class="field">
         <label>Keeps a roll with
           <span class="hint" id="rule-readback">nothing targeted yet</span>
@@ -447,6 +459,7 @@ let editing = false;
 let noteTimer = null;
 let sparkTargets = {};   // name -> minimum stars
 let sparkMode = "or";
+let keep3Star = [];      // blue sparks kept on sight at 3★
 const tagBoxes = {};     // id -> TagBox
 
 /* A list of names, edited as chips. Used for the three skill tiers and the
@@ -768,10 +781,18 @@ function showReadback() {
     clauses.push(blue.concat(pink));
   }
   getReqs().forEach((row) => clauses.push(row.map((e) => star(e.name, e.stars))));
-  $("rule-readback").textContent = clauses.length
+  const rule = clauses.length
     ? clauses.map((c) => (clauses.length > 1 && c.length > 1 ? `(${c.join(" or ")})` : c.join(" or ")))
         .join(" and ")
-    : "nothing targeted yet";
+    : "";
+  // The override is an "or" over the whole rule, not one more clause in it -
+  // written that way round because a reader who sees it joined by "and" will
+  // take it for another thing the roll has to have.
+  const keep = keep3Star.map((n) => star(n, 3));
+  $("rule-readback").textContent =
+    keep.length && rule ? `${keep.join(" or ")}, or ${rule}`
+    : keep.length ? keep.join(" or ")
+    : rule || "nothing targeted yet";
 }
 
 let presetList = [];
@@ -874,6 +895,39 @@ function buildSparks() {
   sep.className = "sep";
   host.replaceChildren(...SPARK_BLUE.map(make), sep, ...SPARK_PINK.map(make));
   renderSparks();
+}
+
+/* The override's buttons toggle rather than cycling stars: three is the only
+   count that means anything here. */
+function buildKeep3() {
+  $("keep3").replaceChildren(...SPARK_BLUE.map((name) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "spark";
+    b.dataset.name = name;
+    b.onclick = () => {
+      const i = keep3Star.indexOf(name);
+      if (i < 0) keep3Star.push(name); else keep3Star.splice(i, 1);
+      renderKeep3();
+    };
+    return b;
+  }));
+  renderKeep3();
+}
+
+function renderKeep3() {
+  for (const b of $("keep3").querySelectorAll(".spark")) {
+    const on = keep3Star.includes(b.dataset.name);
+    b.classList.toggle("on", on);
+    b.replaceChildren(b.dataset.name);
+    if (on) {
+      const s = document.createElement("span");
+      s.className = "st";
+      s.textContent = " ★★★";
+      b.append(s);
+    }
+  }
+  showReadback();
 }
 
 function renderSparks() {
@@ -1024,9 +1078,14 @@ function tierSummary(d) {
 function sparkSummary(d) {
   const t = d.spark_reroll_targets || {};
   const names = Object.keys(t);
-  if (!names.length) return "no targets - will not reroll";
+  const keep = (d.spark_keep_3star || []).map((n) => `${n} 3★`);
+  if (!names.length && !keep.length && !(d.spark_skill_targets || []).length) {
+    return "no targets - will not reroll";
+  }
   const shown = names.map((k) => `${k} ${t[k]}★`).join(", ");
-  return shown + (d.spark_reroll_mode === "and" ? " (both groups)" : "");
+  const mode = names.length && d.spark_reroll_mode === "and" ? " (both groups)" : "";
+  return [shown + mode, keep.length ? `always keep ${keep.join(", ")}` : ""]
+    .filter(Boolean).join("; ");
 }
 
 function openForm() {
@@ -1046,11 +1105,13 @@ function openForm() {
   $("onlymine").checked = !!d.learn_skill_only_user_provided;
 
   sparkTargets = Object.assign({}, d.spark_reroll_targets || {});
+  keep3Star = (d.spark_keep_3star || []).slice();
   setReqs(d.spark_skill_targets || []);
   sparkMode = d.spark_reroll_mode === "and" ? "and" : "or";
   $("reroll").checked = !!d.spark_reroll_enabled;
   $("stopreroll").checked = !!d.stop_at_spark_reroll;
   renderSparks();
+  renderKeep3();
   syncBlocks();
 
   $("task-view").hidden = true;
@@ -1140,6 +1201,7 @@ async function saveTask(ev) {
     spark_reroll_enabled: $("reroll").checked,
     spark_reroll_targets: sparkTargets,
     spark_skill_targets: getReqs(),
+    spark_keep_3star: keep3Star,
     spark_reroll_mode: sparkMode,
     stop_at_spark_reroll: $("stopreroll").checked,
     // The engine reads this as a level, not a flag: 0 never spends, higher
@@ -1192,6 +1254,7 @@ $("stop").onclick = () => act("/action/bot/stop", "Stopping");
 $("finish").onclick = () => act("/action/bot/stop-after-run", "Will stop after this run");
 for (const id of ["tier0", "tier1", "tier2", "blacklist"]) tagBoxes[id] = new TagBox(id);
 buildSparks();
+buildKeep3();
 loadSkillNames();
 $("preset-load").onclick = applyPreset;
 $("preset-save").onclick = savePreset;

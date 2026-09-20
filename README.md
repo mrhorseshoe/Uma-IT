@@ -45,6 +45,12 @@ presets; **Only buy what I list** stops after stage 1.
   there is no operator precedence to guess at. A plain-English readback under
   the builder states the rule back to you.
 
+Above all of that sits **Always keep 3★**: name any of the five blue sparks
+and a roll holding one at 3★ is kept on sight, whatever the rest of the rule
+wanted. Across 281 logged spark sets a blue spark read 3★ in 6.8% of them —
+about 1.4% for a particular stat — which is rare enough that a roll carrying
+one is worth more than the one you were farming for.
+
 It reads the whole list, scrolling past the fold when a target could be hiding
 below it, and when neither roll qualifies it keeps the set with more sparks.
 
@@ -120,7 +126,8 @@ bot and authorise spending.
 
 Everything is set from the dashboard. The task carries 15 user-facing settings:
 the scenario, the card to borrow, whether to keep the last parents, the loop
-count, whether to restore TP, four for skill buying and six for spark reroll.
+count, whether to restore TP, four for skill buying and seven for spark
+reroll.
 
 A reroll costs **30 TP**, the same as a career, so the targets decide what a
 loop costs. A single 3★ spark rerolls on roughly 99% of careers; a row of

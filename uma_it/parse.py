@@ -726,7 +726,37 @@ def spark_skill_rows_check(rows, requirements) -> str:
     return ', '.join(satisfied)
 
 
-def spark_rule_check(rows, targets, mode, default_min_stars, requirements) -> str:
+# A 3* blue spark is rare enough to be worth keeping on its own, whatever the
+# rest of the rule wanted. Measured over the 281 distinct spark sets this bot
+# has logged: some blue spark read 3* in 6.8% of them, which is about 1.4% for
+# a named stat.
+SPARK_OVERRIDE_STARS = 3
+
+
+def spark_override_check(rows, names) -> str:
+    """A 3* blue spark the task said to keep on sight, or ''.
+
+    Blue only, and 3* only: those are the terms the override was asked for.
+    Widening either makes it fire far more often than "rare" - over the same
+    281 sets, pink hit 3* in 11.0% against blue's 6.8%, and 2* is ordinary.
+
+    Names that are not blue sparks are ignored rather than matched loosely; the
+    dashboard only offers the five, and `build_task` drops anything else.
+    """
+    wanted = {str(n).strip().lower() for n in (names or [])} & SPARK_BLUE_KEYS
+    if not wanted:
+        return ''
+    for row in rows:
+        if row.get('color') != 'blue':
+            continue
+        name = (row.get('canonical') or '').lower()
+        if name in wanted and (row.get('stars') or 0) >= SPARK_OVERRIDE_STARS:
+            return f"{row['canonical']} {row['stars']}* (3* override)"
+    return ''
+
+
+def spark_rule_check(rows, targets, mode, default_min_stars, requirements,
+                     override=()) -> str:
     """The whole keep-or-reroll rule: colour targets AND white requirements.
 
     White rows are ANDed onto the blue/pink result rather than joining their
@@ -734,7 +764,14 @@ def spark_rule_check(rows, targets, mode, default_min_stars, requirements) -> st
     gets genuinely confusing, and for the case it was built for - parent
     farming, where the stats and aptitudes do not matter - blue and pink are
     simply left empty and that half is vacuously true.
+
+    `override` sits outside all of that: a 3* blue spark on the list keeps the
+    roll before any of the rest is consulted. It is checked first so it can
+    never be reached through the AND of two rules that happen to fail.
     """
+    keep = spark_override_check(rows, override)
+    if keep:
+        return keep
     colour_desc = ''
     if targets:
         colour_desc = spark_rows_check(rows, targets, mode, default_min_stars)

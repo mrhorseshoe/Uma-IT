@@ -18,7 +18,8 @@ import numpy as np
 
 import uma_it.spark as spark
 import uma_it.dialogs as dialogs
-from uma_it.parse import spark_rows_check, SPARK_BLUE_KEYS, SPARK_BLUE_NAMES
+from uma_it.parse import (spark_rows_check, spark_rule_check, spark_override_check,
+                          SPARK_BLUE_KEYS, SPARK_BLUE_NAMES)
 from uma_it.asset.point import CULTIVATE_FACTOR_REROLL_SKIP, ESCAPE
 from uma_it.context import CareerContext
 from uma_it.task import build_task, EndTaskReason
@@ -102,6 +103,38 @@ check("'or' matches on either",
 check("a legacy flat list of targets still works",
       spark_rows_check([row('Speed', 3)], ['speed'], 'or', 3) == 'Speed')
 
+print("\nthe 3* blue override, which outranks everything above")
+# Blue 3* is rare enough to be worth keeping a career for on its own, so it is
+# checked before the rule rather than joined to it. The distinction only shows
+# up when the rest of the rule fails: as another target it would still have to
+# survive the AND with the white requirement rows, and would keep nothing.
+white = lambda name, stars: {'name': name, 'canonical': name, 'stars': stars,
+                             'color': 'white', 'y': 0}
+check("a listed blue spark at 3* is a keep",
+      spark_override_check([row('Stamina', 3)], ['Stamina']) == 'Stamina 3* (3* override)',
+      spark_override_check([row('Stamina', 3)], ['Stamina']))
+check("  at 2* it is not", spark_override_check([row('Stamina', 2)], ['Stamina']) == '')
+check("an unlisted blue spark at 3* is not",
+      spark_override_check([row('Speed', 3)], ['Stamina']) == '')
+check("  and neither is a pink one, however it got onto the list",
+      spark_override_check([row('Turf', 3)], ['Turf', 'Stamina']) == '')
+check("an empty list overrides nothing", spark_override_check([row('Speed', 3)], []) == '')
+
+req = [[{'name': 'URA Finale', 'stars': 3}]]
+check("it keeps a roll the white requirements reject",
+      spark_rule_check([row('Stamina', 3), white('URA Finale', 1)], {}, 'or', 3,
+                       req, ['Stamina']).endswith('(3* override)'),
+      spark_rule_check([row('Stamina', 3), white('URA Finale', 1)], {}, 'or', 3,
+                       req, ['Stamina']))
+check("  and changes nothing when it does not fire",
+      spark_rule_check([row('Stamina', 2), white('URA Finale', 1)], {}, 'or', 3,
+                       req, ['Stamina']) == '')
+check("  while a satisfied rule still reads as itself",
+      spark_rule_check([row('Stamina', 2), white('URA Finale', 3)], {}, 'or', 3,
+                       req, ['Stamina']) == 'URA Finale 3*',
+      spark_rule_check([row('Stamina', 2), white('URA Finale', 3)], {}, 'or', 3,
+                       req, ['Stamina']))
+
 print("\nrerolling is off unless asked for")
 ctx = FakeCtx()
 check("no targets and not enabled means inactive", spark._spark_reroll_active(ctx) is False)
@@ -109,6 +142,9 @@ ctx = FakeCtx(spark_reroll_enabled=True)
 check("enabled with no targets is still inactive", spark._spark_reroll_active(ctx) is False)
 ctx = FakeCtx(spark_reroll_enabled=True, spark_reroll_targets={'speed': 3})
 check("enabled with a target is active", spark._spark_reroll_active(ctx) is True)
+ctx = FakeCtx(spark_reroll_enabled=True, spark_keep_3star=['Stamina'])
+check("  and the 3* override counts as a target on its own",
+      spark._spark_reroll_active(ctx) is True)
 
 print("\na satisfied first roll is kept, not rerolled")
 spark.parse_spark_rows = lambda _ctx: [row('Speed', 3)]
@@ -121,6 +157,18 @@ check("  and records why", ctx.career.spark_reroll_result.get('rerolled') is Fal
       str(ctx.career.spark_reroll_result))
 check("  and counts it as a run that met the requirements",
       ctx.task.detail.spark_goal_runs == 1, str(ctx.task.detail.spark_goal_runs))
+
+print("\n  and the override keeps a roll that misses every requirement")
+spark.parse_spark_rows = lambda _ctx: [row('Stamina', 3), white('URA Finale', 1)]
+ctx = FakeCtx(career_state={'parse_factor_done': True}, spark_reroll_enabled=True,
+              spark_skill_targets=[[{'name': 'URA Finale', 'stars': 3}]],
+              spark_keep_3star=['Stamina'])
+spark.script_factor_reroll(ctx)
+check("no 30 TP reroll is bought",
+      ctx.ctrl.clicks == [NAME(CULTIVATE_FACTOR_REROLL_SKIP)], str(ctx.ctrl.clicks))
+check("  and it is recorded as a kept roll",
+      (ctx.career.spark_reroll_result or {}).get('chosen') == 'original',
+      str(ctx.career.spark_reroll_result))
 
 print("\nan unreadable roll is kept rather than gambled on")
 spark.parse_spark_rows = lambda _ctx: []
