@@ -1192,8 +1192,16 @@ async function saveTask(ev) {
     loops_done: (task && task.detail && task.detail.loops_done) || 0,
     spark_goal_runs: (task && task.detail && task.detail.spark_goal_runs) || 0,
     // Kept so saving a task mid-wait does not send it straight back to a
-    // career the game will refuse.
+    // career the game will refuse. The clocks go with it: they are durable
+    // state the task has earned, not settings, and an edit that reset them
+    // would change what the bot does next. Zeroing tt_last_empty_at sends it
+    // to the Race tab before the next career to be told there is no RP;
+    // zeroing the TP pair restarts the count that gives up after 8 hours.
     resume_after: (task && task.detail && task.detail.resume_after) || 0,
+    tt_pending: !!(task && task.detail && task.detail.tt_pending),
+    tt_last_empty_at: (task && task.detail && task.detail.tt_last_empty_at) || 0,
+    tp_wait_since: (task && task.detail && task.detail.tp_wait_since) || 0,
+    tp_waited_seconds: (task && task.detail && task.detail.tp_waited_seconds) || 0,
     use_last_parents: $("parents").checked,
     skip_learn_skill: $("skills").checked,
     learn_skill_list: [0, 1, 2].map((i) => tagBoxes["tier" + i].get()),
