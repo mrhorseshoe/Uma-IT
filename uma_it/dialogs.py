@@ -76,6 +76,42 @@ UNKNOWN_FRAMES_BEFORE_HOME = 40
 MATCH_THRESHOLD = 0.8
 
 
+# Unknown dialogs this process has already photographed. One frame each is
+# enough to identify a screen, and a dialog the bot bounces off 170 times an
+# hour would otherwise fill the disk with the same picture.
+_captured = set()
+
+
+def _capture_unknown(ctx, raw: str):
+    """Keep one frame of a dialog no entry matched.
+
+    A title the router cannot place gets the blind corner click, and the log
+    then says only what was read. That is not enough to fix it: 'Sparks' has
+    been bounced off 720 times this week and nobody can say what it is, and on
+    20 Sep a 'Schedule Race' dialog landed in the middle of the agenda load and
+    the career started two races short. Both are unfalsifiable from text.
+
+    One picture per title per process, written beside the other debug
+    captures, and never at the cost of the frame it is clearing.
+    """
+    key = (raw or '').strip().lower()
+    if not key or key in _captured:
+        return
+    _captured.add(key)
+    try:
+        import os, re
+        import cv2
+        os.makedirs('screenshot/dialogs', exist_ok=True)
+        safe = re.sub(r'[^A-Za-z0-9]+', '_', raw)[:40] or 'blank'
+        path = f'screenshot/dialogs/{time.strftime("%Y%m%d_%H%M%S")}_{safe}.png'
+        img = ctx.current_screen if getattr(ctx, 'current_screen', None) is not None \
+            else ctx.ctrl.get_screen()
+        cv2.imwrite(path, img)
+        log.info(f"Kept a frame of the unrecognised dialog {raw!r} at {path}")
+    except Exception as e:
+        log.debug(f"unknown-dialog capture failed: {e}")
+
+
 def _escape(ctx, what: str):
     """Clear a screen with the corner click the blind fallback would make.
 
@@ -476,6 +512,7 @@ def script_dialog(ctx):
         log.info(f"Dialog {title!r} (OCR {raw!r}) - not handled by this app, clearing")
     else:
         log.warning(f"Unknown dialog title - OCR: {raw!r}")
+        _capture_unknown(ctx, raw)
     _escape(ctx, f"Unhandled dialog {title or raw!r}")
 
 
