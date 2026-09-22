@@ -234,6 +234,10 @@ def script_factor_reroll(ctx):
         time.sleep(1)
         rows = parse_spark_rows(ctx)
         log.info(f"🎲 Spark roll 1: {_spark_rows_text(rows)}")
+        # The top of the list, held before `_decide` can scroll it away. Only
+        # written to disk if the roll is kept - see the keep branch below.
+        first_page = ctx.ctrl.get_screen()
+        first_count = len(rows)
         targets = detail.spark_reroll_targets
         min_stars = getattr(detail, 'spark_reroll_min_stars', 3)
         mode = getattr(detail, 'spark_reroll_mode', 'or')
@@ -246,6 +250,15 @@ def script_factor_reroll(ctx):
         d.spark_roll1_rows = rows
         if hit:
             log.info(f"🎲 Desired spark(s) '{hit}' present at the required stars - keeping this roll")
+            # A roll kept here was never photographed: every other capture is
+            # taken on the way to a reroll. So a keep - the outcome that matters
+            # most - was the one result nobody could check against the screen.
+            # The top of the list shows blue and pink; the rows that decided it
+            # are usually white and below the fold, so when the decision read
+            # past it, the scrolled frame is kept as well.
+            _save_spark_debug(ctx, "keep", first_page)
+            if len(rows) > first_count:
+                _save_spark_debug(ctx, "keep_scrolled")
             _count_goal_met(ctx)
             d.spark_reroll_phase = 'keep'
             d.spark_reroll_result = {'rerolled': False, 'chosen': 'original',

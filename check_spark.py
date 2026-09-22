@@ -28,6 +28,12 @@ from bot.base.task import TaskExecuteMode, TaskStatus
 spark.time.sleep = lambda *_: None
 dialogs.time.sleep = lambda *_: None
 
+# Captures are recorded, not written. A check that saved black frames into
+# screenshot/spark_reroll/ would be mixing fakes into the real captures those
+# screens were calibrated from.
+captures = []
+spark._save_spark_debug = lambda _ctx, tag, img=None: captures.append(tag)
+
 failures = []
 NAME = lambda p: getattr(p, 'desc', p)
 
@@ -157,6 +163,22 @@ check("  and records why", ctx.career.spark_reroll_result.get('rerolled') is Fal
       str(ctx.career.spark_reroll_result))
 check("  and counts it as a run that met the requirements",
       ctx.task.detail.spark_goal_runs == 1, str(ctx.task.detail.spark_goal_runs))
+check("  and photographs the kept roll, which nothing else ever did",
+      captures == ['keep'], str(captures))
+
+# A decision that read past the fold keeps the scrolled frame too: the rows
+# that decided it are the ones the top-of-list picture cannot show.
+captures.clear()
+real_decide = spark._decide
+spark.parse_spark_rows = lambda _ctx: [row('Speed', 3)]
+spark._decide = lambda _ctx, rows, *_a: (rows + [row('Turf', 2)], 'Speed')
+ctx = FakeCtx(career_state={'parse_factor_done': True},
+              spark_reroll_enabled=True, spark_reroll_targets={'speed': 3})
+spark.script_factor_reroll(ctx)
+spark._decide = real_decide
+check("  and the scrolled frame as well when the decision read past the fold",
+      captures == ['keep', 'keep_scrolled'], str(captures))
+captures.clear()
 
 print("\n  and the override keeps a roll that misses every requirement")
 spark.parse_spark_rows = lambda _ctx: [row('Stamina', 3), white('URA Finale', 1)]
