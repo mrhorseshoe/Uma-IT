@@ -55,6 +55,7 @@ from uma_it.asset.point import (
     STORY_REWARDS_COLLECTED_CLOSE,
     HOME_TAB,
     NETWORK_ERROR_CONFIRM,
+    SPARKS_CLOSE,
     RESTORE_NO,
     TO_RECOVER_TP,
     TO_CULTIVATE_PREPARE_NEXT,
@@ -352,6 +353,11 @@ DIALOGS = {
     'Notices':          lambda ctx: _escape(ctx, "Daily reset 'Notices' popup"),
     # The shop's offer of the day. Always declined - the bot spends nothing.
     'Daily Sale':       decline_daily_sale,
+    # The legacy Sparks list, opened from the parent pickers. It is nearly the
+    # whole screen, so the blind corner click lands *on* it and does nothing:
+    # on 23 Sep the bot bounced off this dialog 441 times in 2h41m and the
+    # click guard restarted the game 322 times. Its one button is Close.
+    'Sparks':           _tap(SPARKS_CLOSE, "Legacy Sparks list - closing"),
 
     # -- ending a career -----------------------------------------------------
     'Career Complete':      _career_complete,

@@ -16,7 +16,8 @@ sys.path.insert(0, os.getcwd())
 import numpy as np
 
 import uma_it.dialogs as dialogs
-from uma_it.asset.point import (ESCAPE, RESTORE_NO, TO_RECOVER_TP, CULTIVATE_FINISH_RETURN_CONFIRM,
+from uma_it.asset.point import (ESCAPE, RESTORE_NO, TO_RECOVER_TP, SPARKS_CLOSE,
+                                CULTIVATE_FINISH_RETURN_CONFIRM,
                                 TO_CULTIVATE_PREPARE_NEXT,
                                 EXIT_WITHOUT_LEARNING_SKILLS_OK)
 from uma_it.context import CareerContext
@@ -113,6 +114,17 @@ finally:
     # Restoring matters: a leaked patch here silently rewrote later checks
     # twice while this suite was being written.
     dialogs.find_green_button = green
+
+# 441 bounces in 2h41m on 23 Sep, and 322 game restarts by the click guard,
+# because the blind fallback's corner point at (5, 715) is *inside* this
+# dialog. The frame the router kept shows one button: Close, OCR'd at
+# (218-500, 1145-1220). Naming the screen is the fix; removing the fallback
+# click is not - that was tried upstream and hung the bot.
+print("\nthe legacy Sparks list, which has to be closed by its own button")
+ctx = route('Sparks')
+check("'Sparks' clicks Close, not the corner",
+      ctx.ctrl.clicks == [NAME(SPARKS_CLOSE)], str(ctx.ctrl.clicks))
+check("  and that is not the fallback click", NAME(SPARKS_CLOSE) != NAME(ESCAPE))
 
 print("\nending a career")
 ctx = route('Career Complete')

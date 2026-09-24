@@ -86,6 +86,11 @@ RESTORE_NO = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordi
 # The bottom navigation's Home tab, present on every screen outside a career.
 # The way back to something the bot knows.
 HOME_TAB = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(360, 1228), "Bottom nav - Home", None)
+# The legacy Sparks list's only button. Measured off the frame the router kept
+# on 23 Sep: the button reads 'Close' between x 218-500, y 1145-1220. It has to
+# be this point and not the blind corner click, which lands at (5, 715) - a
+# spot *inside* this dialog, where a tap does nothing at all.
+SPARKS_CLOSE = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(360, 1182), "Sparks list - Close", None)
 
 # --- dialogs that only script_info handled in the parent ------------------
 # Not reachable from any screen definition, which is why they arrive after the
