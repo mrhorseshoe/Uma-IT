@@ -293,7 +293,24 @@ TWO_BUTTON_OFFSET = 60
 
 
 def decline_daily_sale(ctx):
-    """Cancel the shop's Daily Sale offer, wherever it appears.
+    """Cancel the shop's Daily Sale offer, wherever it appears."""
+    decline_offer(ctx, "Daily Sale")
+
+
+def decline_carat_pack(ctx):
+    """Cancel the Daily Carat Pack offer - a real-money purchase prompt.
+
+    Seen first on 24 Sep at 11:20, during a turnover: "You can now purchase the
+    Daily Carat Pack!" with Cancel on the left and a green Purchase Carats on
+    the right. The blind corner click cleared it that time by landing just off
+    the dialog. A prompt whose other button spends money gets its Cancel
+    pressed on purpose, not by luck.
+    """
+    decline_offer(ctx, "Daily Carat Pack")
+
+
+def decline_offer(ctx, name: str):
+    """Press Cancel on a two-button shop offer: Cancel left, green purchase right.
 
     Cancel rather than the corner click the parent project makes at (0, 0): a
     tap outside is a dismissal the dialog may or may not honour, and this one
@@ -318,13 +335,18 @@ def decline_daily_sale(ctx):
     try:
         ok = find_green_button(screen, 70, top, 660, 1270)
     except Exception as e:
-        log.debug(f"Daily Sale: the green button search failed ({e})")
-    if ok and abs(ok[0] - 360) >= TWO_BUTTON_OFFSET:
-        ctx.ctrl.click(720 - ok[0], ok[1], "Daily Sale - Cancel")
+        log.debug(f"{name}: the green button search failed ({e})")
+    if ok and abs(ok[0] - 360) >= TWO_BUTTON_OFFSET and ok[0] > 360:
+        # The green button must be on the *right* for its mirror to be Cancel.
+        # A green button on the left would make the mirror the purchase itself.
+        log.info(f"{name} - declining (Cancel, mirroring the purchase button at {ok})")
+        ctx.ctrl.click(720 - ok[0], ok[1], f"{name} - Cancel")
         time.sleep(1)
         return
-    where = "no green button found" if not ok else f"one centred button at {ok}"
-    _escape(ctx, f"Daily Sale offer ({where})")
+    where = ("no green button found" if not ok
+             else f"one centred button at {ok}" if abs(ok[0] - 360) < TWO_BUTTON_OFFSET
+             else f"green button on the left at {ok}")
+    _escape(ctx, f"{name} offer ({where})")
 
 
 def _auto_select(ctx):
@@ -351,8 +373,9 @@ DIALOGS = {
     # seconds before a countdown expired and was cleared only because the
     # fallback exists.
     'Notices':          lambda ctx: _escape(ctx, "Daily reset 'Notices' popup"),
-    # The shop's offer of the day. Always declined - the bot spends nothing.
+    # The shop's offers. Always declined - the bot spends nothing on its own.
     'Daily Sale':       decline_daily_sale,
+    'Daily Carat Pack': decline_carat_pack,
     # The legacy Sparks list, opened from the parent pickers. It is nearly the
     # whole screen, so the blind corner click lands *on* it and does nothing:
     # on 23 Sep the bot bounced off this dialog 441 times in 2h41m and the
@@ -522,6 +545,42 @@ def script_dialog(ctx):
     _escape(ctx, f"Unhandled dialog {title or raw!r}")
 
 
+# A frame the blind fallback has seen this many times in a row gets
+# photographed. Five, because the click guard trips at eleven: by five the
+# screen is sticking, and a picture still comes before the restart that
+# would take it away.
+UNKNOWN_CAPTURE_AFTER = 5
+# Per process. The process restarts after every career, so this is per run;
+# low, because what is wanted is a handful of examples, not a film.
+MAX_UNKNOWN_CAPTURES = 4
+_unknown_captures = 0
+
+
+def _capture_unrecognised_frame(ctx, streak: int):
+    """Keep a frame the blind fallback is about to click at, blind.
+
+    The turnovers on 24 Sep cost 24 click-guard restarts across 11 careers,
+    and none of it can be diagnosed from the log: the fallback's clicks log at
+    debug level and leave no picture. The dialog capture is what finally
+    identified 'Sparks' after weeks of guessing; this is the same instrument
+    for the frames that are not dialogs at all.
+    """
+    global _unknown_captures
+    if _unknown_captures >= MAX_UNKNOWN_CAPTURES:
+        return
+    _unknown_captures += 1
+    try:
+        import os
+        os.makedirs('screenshot/unknown', exist_ok=True)
+        path = f'screenshot/unknown/{time.strftime("%Y%m%d_%H%M%S")}_streak{streak}.png'
+        img = ctx.current_screen if getattr(ctx, 'current_screen', None) is not None \
+            else ctx.ctrl.get_screen()
+        cv2.imwrite(path, img)
+        log.info(f"{streak} frames in a row match no screen - kept one at {path}")
+    except Exception as e:
+        log.debug(f"unrecognised-frame capture failed: {e}")
+
+
 def script_not_found_ui(ctx):
     """The blind fallback, for a frame matching no screen at all.
 
@@ -551,6 +610,8 @@ def script_not_found_ui(ctx):
     if career is not None:
         seen = getattr(career, 'unknown_frames', 0) + 1
         career.unknown_frames = seen
+        if seen == UNKNOWN_CAPTURE_AFTER:
+            _capture_unrecognised_frame(ctx, seen)
         if seen % UNKNOWN_FRAMES_BEFORE_HOME == 0:
             log.warning(f"{seen} frames in a row match no screen - pressing Home "
                         f"to get back to something known")

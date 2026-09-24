@@ -295,6 +295,12 @@ RULES = [
     ("the team result", REF_TT_NEXT_RESULT, TT_NEXT_RESULT),
 ]
 
+def _carat_pack(ctx):
+    """Decline the Daily Carat Pack through the router's own handler."""
+    from uma_it.dialogs import decline_carat_pack
+    decline_carat_pack(ctx)
+
+
 def _daily_sale(ctx):
     """Decline the shop offer, through the router's own handler.
 
@@ -315,7 +321,8 @@ def _daily_sale(ctx):
 # limit would have ended the session after four minutes, but the 30s watchdog
 # reached three strikes at ninety seconds and restarted the game first.
 TITLE_RULES = [("Items Selected", TT_ITEMS_SELECTED_OK),
-               ("Daily Sale", _daily_sale)]
+               ("Daily Sale", _daily_sale),
+               ("Daily Carat Pack", _carat_pack)]
 
 
 def run_frame(ctx) -> bool:

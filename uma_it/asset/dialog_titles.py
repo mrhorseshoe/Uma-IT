@@ -29,6 +29,7 @@ OWNED_TITLES = [
     'Follow Trainer',
     'Notices',
     'Daily Sale',
+    'Daily Carat Pack',
     'Sparks',
     'Career Complete',
     'Complete Career',

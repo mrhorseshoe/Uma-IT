@@ -110,6 +110,23 @@ try:
     ctx = route('Daily Sale')
     check("  and a failed search does not leave the bot sitting on it",
           ctx.ctrl.clicks == [NAME(ESCAPE)], str(ctx.ctrl.clicks))
+    # The Daily Carat Pack is the same two-button shape, and its green button
+    # spends real money. Verified against the frame captured on 24 Sep: the
+    # router reads the title, finds Purchase Carats at (518, 832) and presses
+    # (202, 832), where the text reads 'Cancel'.
+    dialogs.find_green_button = lambda *_a: (518, 832)
+    ctx = route('Daily Carat Pack')
+    check("'Daily Carat Pack' presses Cancel, the mirror of Purchase Carats",
+          ctx.ctrl.clicks == [(202, 832, "Daily Carat Pack - Cancel")], str(ctx.ctrl.clicks))
+
+    # Mirroring is only safe while the green button is on the right. If a
+    # layout ever put it on the left, its mirror would be the purchase itself -
+    # so that case is cleared instead, never mirrored.
+    dialogs.find_green_button = lambda *_a: (202, 832)
+    for title in ('Daily Carat Pack', 'Daily Sale'):
+        ctx = route(title)
+        check(f"  a green button on the left is never mirrored ({title})",
+              ctx.ctrl.clicks == [NAME(ESCAPE)], str(ctx.ctrl.clicks))
 finally:
     # Restoring matters: a leaked patch here silently rewrote later checks
     # twice while this suite was being written.
@@ -285,6 +302,45 @@ dialogs.read_title = lambda _ctx: 'Notices'
 dialogs.script_dialog(ctx)
 check("  and resets when a different dialog appears", ctx.career.dialog_repeat == 1,
       str(ctx.career.dialog_repeat))
+
+# 24 Sep: 24 click-guard restarts across 11 turnovers, and no way to see why -
+# the fallback's clicks log at debug level and leave no picture. So a streak
+# of unrecognised frames that reaches five gets one photograph, before the
+# guard's eleven takes the screen away.
+print("\nthe blind fallback photographs a screen that is sticking")
+kept = []
+real_capture = dialogs._capture_unrecognised_frame
+dialogs._capture_unrecognised_frame = lambda _ctx, streak: kept.append(streak)
+try:
+    ctx = FakeCtx()
+    for _ in range(12):
+        dialogs.script_not_found_ui(ctx)
+    check("one frame is kept, at the fifth in a row",
+          kept == [dialogs.UNKNOWN_CAPTURE_AFTER], str(kept))
+    kept.clear()
+    ctx.career.unknown_frames = 0          # a recognised screen resets the streak
+    for _ in range(3):
+        dialogs.script_not_found_ui(ctx)
+    check("  and a short streak keeps nothing", kept == [], str(kept))
+finally:
+    dialogs._capture_unrecognised_frame = real_capture
+
+# Per process, because the process restarts after every career: a handful of
+# examples a run, not a film of every stuck second.
+written = []
+real_imwrite, real_count = dialogs.cv2.imwrite, dialogs._unknown_captures
+dialogs.cv2.imwrite = lambda path, _img: written.append(path) or True
+try:
+    dialogs._unknown_captures = 0
+    ctx = FakeCtx()
+    for _ in range(dialogs.MAX_UNKNOWN_CAPTURES + 3):
+        dialogs._capture_unrecognised_frame(ctx, 5)
+    check("  at most a few per run", len(written) == dialogs.MAX_UNKNOWN_CAPTURES,
+          str(len(written)))
+    check("  written beside the other debug captures",
+          all(p.startswith('screenshot/unknown/') for p in written), str(written[:1]))
+finally:
+    dialogs.cv2.imwrite, dialogs._unknown_captures = real_imwrite, real_count
 
 print("\nthe blind fallback for a frame matching no screen")
 ctx = FakeCtx()
