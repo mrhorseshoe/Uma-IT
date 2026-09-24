@@ -13,8 +13,12 @@ Cup, the catch-doll minigame and the Fujikiseki show are inherited from an
 upstream project and do not occur on Global at all.
 """
 from uma_it.asset.ui import (
+    # the game coming up, which is where a restart lands
+    GAME_LOADING,
+    GAME_TITLE,
     # entering a career
     MAIN_MENU,
+    MAIN_MENU_2,
     CULTIVATE_SCENARIO_SELECT,
     CULTIVATE_UMAMUSUME_SELECT,
     CULTIVATE_EXTEND_UMAMUSUME_SELECT,
@@ -45,7 +49,13 @@ from uma_it.asset.ui import (
 # Ordering is not significant - the executor matches all of them against each
 # frame and collects whichever assert true. Grouped here by phase for reading.
 scan_ui_list = [
+    # First, because they are where a restart lands and the bot restarts the
+    # game itself several times a day.
+    GAME_LOADING,
+    GAME_TITLE,
+
     MAIN_MENU,
+    MAIN_MENU_2,
     CULTIVATE_SCENARIO_SELECT,
     CULTIVATE_UMAMUSUME_SELECT,
     CULTIVATE_EXTEND_UMAMUSUME_SELECT,

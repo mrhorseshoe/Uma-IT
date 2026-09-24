@@ -20,7 +20,10 @@ import bot.base.log as logger
 
 from uma_it.asset.ui import (
     INFO,
+    GAME_LOADING,
+    GAME_TITLE,
     MAIN_MENU,
+    MAIN_MENU_2,
     CULTIVATE_SCENARIO_SELECT,
     CULTIVATE_UMAMUSUME_SELECT,
     CULTIVATE_EXTEND_UMAMUSUME_SELECT,
@@ -164,7 +167,10 @@ script_dicts: Dict[UmaItTaskType, Dict[UI, Callable]] = {
         INFO: script_dialog,
 
         # entering a career
+        GAME_LOADING: enter.script_game_loading,
+        GAME_TITLE: enter.script_game_title,
         MAIN_MENU: enter.script_main_menu,
+        MAIN_MENU_2: enter.script_main_menu,
         CULTIVATE_SCENARIO_SELECT: enter.script_scenario_select,
         CULTIVATE_UMAMUSUME_SELECT: enter.script_umamusume_select,
         CULTIVATE_EXTEND_UMAMUSUME_SELECT: enter.script_extend_umamusume_select,

@@ -20,7 +20,8 @@ import numpy as np
 import uma_it.enter as enter
 import uma_it.collect as collect
 from uma_it.parse import find_green_button as _real_find_green_button
-from uma_it.asset.point import (TO_CULTIVATE_SCENARIO_CHOOSE, TO_CULTIVATE_PREPARE_NEXT,
+from uma_it.asset.point import (TITLE_TAP,
+                                TO_CULTIVATE_SCENARIO_CHOOSE, TO_CULTIVATE_PREPARE_NEXT,
                                 TO_CULTIVATE_PREPARE_AUTO_SELECT,
                                 TO_CULTIVATE_PREPARE_INCLUDE_GUEST,
                                 TO_CULTIVATE_PREPARE_CONFIRM,
@@ -93,6 +94,71 @@ if _crop is not None:
         _abs = (enter.CAREER_REGION[0] + _found[0], enter.CAREER_REGION[1] + _found[1])
         check("  and lands on the button, near the fixed point",
               abs(_abs[0] - 545) < 40 and abs(_abs[1] - 1085) < 40, str(_abs))
+
+# The two screens the game shows while it is coming up, and a second way of
+# seeing Home. All three are matched against real pixels here, because the only
+# thing that can go wrong with a template is that the game stops looking like
+# it - and that is exactly what happened to the first Home crop: an event
+# decorated the bottom-nav Home tab, the crop fell to 0.56-0.78 against a
+# threshold of 0.86, and every unrecognised Home frame went to the blind
+# fallback. Eleven corner taps later the click guard restarted the game, which
+# is why turnovers on 24 Sep cost two to four restarts each.
+print("\nthe game coming up, against real pixels")
+from bot.recog.image_matcher import image_match
+from uma_it.asset.template import UI_GAME_LOADING, UI_GAME_TITLE, UI_MAIN_MENU_2
+
+# Each fixture is the search region of one template, cut from a real frame.
+# For the positive check it is pasted back where it came from, so the match
+# runs through the template's own region config as it does on the game. For the
+# negative check the template is correlated against the other regions directly:
+# a template that matches another of these would have the bot act on the wrong
+# screen at the one moment it has no idea where it is.
+_FIX = {'game_loading_region': (380, 1180, UI_GAME_LOADING),
+        'game_title_region':   (40, 820,   UI_GAME_TITLE),
+        'home_nav_region':     (500, 1160, UI_MAIN_MENU_2)}
+_regions = {}
+for _name in _FIX:
+    _regions[_name] = cv2.imread(f'resource/uma_it/fixture/{_name}.png', 0)
+    check(f"the {_name} fixture loads", _regions[_name] is not None)
+
+for _name, (_x, _y, _tpl) in _FIX.items():
+    _img = _regions[_name]
+    if _img is None:
+        continue
+    _frame = np.zeros((1280, 720), np.uint8)
+    _frame[_y:_y + _img.shape[0], _x:_x + _img.shape[1]] = _img
+    check(f"{_tpl.template_name} finds its own screen where it looks for it",
+          image_match(_frame, _tpl).find_match)
+    for _other, _oimg in _regions.items():
+        if _other == _name or _oimg is None:
+            continue
+        _t = _tpl.template_image
+        if _oimg.shape[0] < _t.shape[0] or _oimg.shape[1] < _t.shape[1]:
+            continue
+        _score = float(cv2.matchTemplate(_oimg, _t, cv2.TM_CCOEFF_NORMED).max())
+        check(f"  and scores under the threshold on {_other}", _score < 0.86,
+              f"{_score:.3f}")
+
+print("\nthe loading screen, which must click nothing")
+# It is static for up to three and a half minutes. A tap per frame reaches the
+# click guard in twelve seconds, and the guard restarts the game - back to this
+# same screen.
+ctx = FakeCtx()
+for _ in range(5):
+    enter.script_game_loading(ctx)
+check("nothing is clicked while the game loads", ctx.ctrl.clicks == [],
+      str(ctx.ctrl.clicks))
+check("  and it says so once, not once a frame",
+      ctx.career.loading_logged is True)
+
+print("\nthe title screen, which must tap but not forever")
+ctx = FakeCtx()
+for _ in range(enter.MAX_TITLE_TAPS + 4):
+    enter.script_game_title(ctx)
+check("it taps to start", ctx.ctrl.clicks and ctx.ctrl.clicks[0] == NAME(TITLE_TAP),
+      str(ctx.ctrl.clicks[:1]))
+check("  a bounded number of times, short of the guard's eleven",
+      len(ctx.ctrl.clicks) == enter.MAX_TITLE_TAPS < 11, str(len(ctx.ctrl.clicks)))
 
 print("\nHome, with the search stubbed")
 enter.find_green_button = lambda *_a: (543, 1112)

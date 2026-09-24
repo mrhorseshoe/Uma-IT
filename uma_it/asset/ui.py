@@ -8,6 +8,11 @@ from bot.base.resource import UI
 import uma_it.asset.template as template
 
 MAIN_MENU = UI("MAIN_MENU", [template.UI_MAIN_MENU], [])
+# Same name and same handler: two ways of seeing one screen, the way
+# CULTIVATE_RESULT already has three. Either match means Home.
+MAIN_MENU_2 = UI("MAIN_MENU", [template.UI_MAIN_MENU_2], [])
+GAME_LOADING = UI("GAME_LOADING", [template.UI_GAME_LOADING], [])
+GAME_TITLE = UI("GAME_TITLE", [template.UI_GAME_TITLE], [])
 CULTIVATE_SCENARIO_SELECT = UI("CULTIVATE_SCENARIO_SELECT", [template.UI_CULTIVATE_SCENARIO_SELECT], [])
 CULTIVATE_FOLLOW_SUPPORT_CARD_SELECT = UI("CULTIVATE_FOLLOW_SUPPORT_CARD_SELECT",
                                           [template.UI_CULTIVATE_FOLLOW_SUPPORT_CARD_SELECT], [])

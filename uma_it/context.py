@@ -83,6 +83,13 @@ class CareerContext:
         self.manual_purchase_completed: bool = False
         self.manual_purchase_initiated: bool = False
 
+        # -- the game coming up ----------------------------------------------
+        # One log line per run for a long load, and a bounded number of taps at
+        # the title screen. Run-scoped: a restart is exactly when both should
+        # start again from zero.
+        self.loading_logged: bool = False
+        self.title_taps: int = 0
+
         # -- team trials, which run between careers ---------------------------
         # When the session began, and when it last recognised something. A race
         # needs no clicks for minutes at a time, so quiet is normal; quiet for

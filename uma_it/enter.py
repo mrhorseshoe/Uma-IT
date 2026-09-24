@@ -15,6 +15,7 @@ from bot.base.task import TaskStatus, EndTaskReason
 from bot.recog.image_matcher import image_match
 
 from uma_it.asset.point import (
+    TITLE_TAP,
     TO_CULTIVATE_SCENARIO_CHOOSE,
     TO_CULTIVATE_PREPARE_NEXT,
     TO_CULTIVATE_PREPARE_AUTO_SELECT,
@@ -66,6 +67,58 @@ SCENARIO_SWIPES = 6
 
 # How many times to refresh the borrow list looking for the wanted card.
 BORROW_REFRESHES = 18
+
+
+# How many taps the title screen gets before it is left to the click guard.
+# The guard restarts the game at eleven clicks on one point, and a restart is
+# the right answer to a title screen that will not start - but only after
+# tapping has honestly been tried.
+MAX_TITLE_TAPS = 6
+# Between taps. The screen takes a moment to react, and a tap per frame would
+# reach the guard in about twelve seconds.
+TITLE_TAP_INTERVAL = 3
+
+
+def script_game_loading(ctx):
+    """The "Now Loading" screen. Clicks nothing, on purpose.
+
+    The game shows this for anything from a few seconds to three and a half
+    minutes after a restart, and the bot restarts the game itself - the
+    watchdog and the click guard both do it. Until this screen had a name it
+    fell to the blind fallback, which taps a corner once a frame; eleven taps
+    tripped the guard, the guard restarted the game, and the game came back to
+    this screen. Turnovers on 24 Sep cost two to four restarts each that way.
+
+    Nothing to click here: the screen goes away by itself. Logged once per run
+    so a long load is visible without three hundred lines of it.
+    """
+    career = getattr(ctx, 'career', None)
+    if career is not None and not getattr(career, 'loading_logged', False):
+        career.loading_logged = True
+        log.info("Game is loading - waiting, clicking nothing")
+    time.sleep(2)
+
+
+def script_game_title(ctx):
+    """The title screen, which says Tap to Start and means it.
+
+    Tapped rather than waited out, and spaced out rather than once a frame:
+    the guard counts eleven clicks on one point, so a tap per frame would have
+    it restart the game in about twelve seconds - which is the thing this
+    handler exists to stop. After a few honest tries it stops tapping and
+    leaves the screen to the guard, because a title screen that will not start
+    is exactly what a restart is for.
+    """
+    career = getattr(ctx, 'career', None)
+    taps = getattr(career, 'title_taps', 0) if career is not None else 0
+    if taps >= MAX_TITLE_TAPS:
+        time.sleep(TITLE_TAP_INTERVAL)
+        return
+    if career is not None:
+        career.title_taps = taps + 1
+    log.info(f"Title screen - tapping to start ({taps + 1})")
+    ctx.ctrl.click_by_point(TITLE_TAP)
+    time.sleep(TITLE_TAP_INTERVAL)
 
 
 def script_main_menu(ctx):

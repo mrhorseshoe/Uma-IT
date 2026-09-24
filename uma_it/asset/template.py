@@ -11,7 +11,39 @@ UI_TEMPLATE_PATH = "/uma_it/ui"
 REF_TEMPLATE_PATH = "/uma_it/ref"
 
 UI_INFO = Template("INFO", UI_TEMPLATE_PATH)
+# The two screens the game shows while it is coming up, and the only two the
+# bot sees after a restart - which it performs itself, through the watchdog and
+# the repetitive-click guard, several times a day. Until they were named, both
+# fell to the blind fallback: a corner click every frame, eleven of them, the
+# guard restarting the game, and the same screen again. Turnovers on 24 Sep
+# cost two to four restarts each.
+#
+# "Now Loading" is the text, not the comic panel above it, which rotates. The
+# title screen is matched on the game's logo rather than the key art behind it,
+# which rotates with events. Both crops carry their own search region, so a
+# frame that is neither costs two small correlations.
+UI_GAME_LOADING = Template("GAME_LOADING", UI_TEMPLATE_PATH,
+                           ImageMatchConfig(match_area=Area(380, 1180, 700, 1280)))
+UI_GAME_TITLE = Template("GAME_TITLE", UI_TEMPLATE_PATH,
+                         ImageMatchConfig(match_area=Area(40, 820, 700, 1000)))
 UI_MAIN_MENU = Template("MAIN_MENU", UI_TEMPLATE_PATH)
+# A second way to recognise Home, because the first one has stopped working.
+# UI_MAIN_MENU is the bottom-nav Home tab, chosen because that tab "does not
+# change" - and then an event decorated it. Measured against three real Home
+# frames five days apart it scores 0.562, 0.715 and 0.784 against a threshold
+# of 0.86, so most Home frames are not recognised as Home at all. The frames
+# that miss fall to the blind fallback, which taps a corner once a frame until
+# the click guard restarts the game: two to four restarts per turnover on
+# 24 Sep, every one of them landing back on the loading screen.
+#
+# This crop is the Race and Scout tabs at the bottom right, picked by diffing
+# those same three frames for a region that had not changed at all: mean
+# difference 0.00, and it scores 1.000 on all three while no other captured
+# screen beats 0.721. Kept alongside the old crop rather than replacing it -
+# either one matching is enough, and the old one is still calibrated for
+# whatever it does still match.
+UI_MAIN_MENU_2 = Template("MAIN_MENU_2", UI_TEMPLATE_PATH,
+                          ImageMatchConfig(match_area=Area(500, 1160, 720, 1280)))
 UI_CULTIVATE_SCENARIO_SELECT = Template("CULTIVATE_SCENARIO_SELECT", UI_TEMPLATE_PATH)
 UI_CULTIVATE_FOLLOW_SUPPORT_CARD_SELECT = Template("CULTIVATE_FOLLOW_SUPPORT_CARD_SELECT", UI_TEMPLATE_PATH)
 UI_CULTIVATE_SUPPORT_CARD_SELECT = Template("CULTIVATE_SUPPORT_CARD_SELECT", UI_TEMPLATE_PATH)

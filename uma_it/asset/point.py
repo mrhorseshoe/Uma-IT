@@ -86,6 +86,10 @@ RESTORE_NO = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordi
 # The bottom navigation's Home tab, present on every screen outside a career.
 # The way back to something the bot knows.
 HOME_TAB = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(360, 1228), "Bottom nav - Home", None)
+# The title screen says "Tap to Start" and means anywhere, so this is the
+# middle of it - clear of the menu button at the bottom right and the trainer
+# ID at the top left, both of which open something.
+TITLE_TAP = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(360, 640), "Title screen - tap to start", None)
 # The legacy Sparks list's only button. Measured off the frame the router kept
 # on 23 Sep: the button reads 'Close' between x 218-500, y 1145-1220. It has to
 # be this point and not the blind corner click, which lands at (5, 715) - a

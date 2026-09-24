@@ -55,7 +55,9 @@ check("  and it is CAREER", task.task_type is UmaItTaskType.CAREER, str(task.tas
 
 print("\nthe screen list")
 declared = {v for v in vars(asset_ui).values() if isinstance(v, UI)}
-check("22 screens are scanned", len(manifest.ui_list) == 22, str(len(manifest.ui_list)))
+# 22 career screens plus the two the game shows while it is coming up, which
+# is where every restart lands - and the bot restarts the game itself.
+check("25 screens are scanned", len(manifest.ui_list) == 25, str(len(manifest.ui_list)))
 check("no screen is listed twice", len(set(manifest.ui_list)) == len(manifest.ui_list))
 outside = [u.ui_name for u in manifest.ui_list if u not in declared]
 check("every scanned screen comes from this project's asset layer",
@@ -70,8 +72,12 @@ names = {}
 for u in manifest.ui_list:
     names.setdefault(u.ui_name, []).append(u)
 collisions = {n: len(v) for n, v in names.items() if len(v) > 1}
-check("no two screens share a name, bar the CULTIVATE_RESULT crops",
-      collisions == {"CULTIVATE_RESULT": 3}, str(collisions))
+# MAIN_MENU is the second deliberate case: its original crop - the bottom-nav
+# Home tab - scores 0.56 to 0.78 on real Home frames after an event decorated
+# that tab, so a second crop of the Race and Scout tabs was added beside it.
+# Both dispatch to the same handler, so sharing a name is the point.
+check("no two screens share a name, bar the crops of one screen",
+      collisions == {"CULTIVATE_RESULT": 3, "MAIN_MENU": 2}, str(collisions))
 
 print("\nhandlers")
 handled = set(script_dicts.get(UmaItTaskType.CAREER, {}))
