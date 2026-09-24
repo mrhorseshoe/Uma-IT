@@ -225,6 +225,7 @@ pre#log {
     <button class="primary" id="start">Start</button>
     <button id="finish">Stop after this run</button>
     <button class="quiet" id="stop">Stop</button>
+    <button class="quiet" id="reset-stats" title="Counts from zero on this screen. The bot's own run count and loop limit are not touched.">Reset stats</button>
   </div>
   <div id="note"></div>
 </section>
@@ -960,6 +961,56 @@ function setConnected(ok) {
   $("conn-text").textContent = ok ? "connected" : "no connection";
 }
 
+/* Reset stats: the display counts from zero, the bot does not.
+
+   The counters on the task are not only for show - `loops_done` is what the
+   loop limit is checked against, so zeroing it on the server would make a
+   five-run task run five more. So the reset is a baseline kept in this
+   browser, and the metrics show the difference from it.
+
+   Not keyed by task id: the bot re-adds its task under a new id every time the
+   process restarts, which is after every career. If a counter ever drops below
+   the baseline, something really did reset it (Run again, a new task), and the
+   baseline is dropped rather than showing a negative number. */
+const STATS_KEY = "uma-it.stats-baseline";
+
+function statsBaseline() {
+  try {
+    return JSON.parse(localStorage.getItem(STATS_KEY) || "null");
+  } catch (e) {
+    return null;
+  }
+}
+
+function setStatsBaseline(b) {
+  try {
+    if (b) localStorage.setItem(STATS_KEY, JSON.stringify(b));
+    else localStorage.removeItem(STATS_KEY);
+  } catch (e) {
+    // Private window or blocked storage: the reset simply will not stick.
+  }
+}
+
+/* The two counters as this screen should show them. */
+function shownStats(d) {
+  const runs = d.loops_done ?? 0;
+  const met = d.spark_goal_runs ?? 0;
+  let b = statsBaseline();
+  if (b && (runs < b.runs || met < b.met)) {
+    setStatsBaseline(null);
+    b = null;
+  }
+  return b ? { runs: runs - b.runs, met: met - b.met } : { runs, met };
+}
+
+function resetStats() {
+  const d = task && task.detail;
+  if (!d) return;
+  setStatsBaseline({ runs: d.loops_done ?? 0, met: d.spark_goal_runs ?? 0 });
+  note("Stats reset - counting from here. The run count and limit are unchanged.");
+  refresh();
+}
+
 async function refresh() {
   try {
     const [status, state, tasks] = await Promise.all([
@@ -1023,11 +1074,16 @@ function render(status, state) {
   }
 
   $("remaining").textContent = it.remaining || "—";
-  $("runs").textContent = d ? (d.loops_done ?? 0) : "—";
+  // Shown from the Reset stats baseline, if one is set. Everything that
+  // decides what the bot does - the limit, "finished", Run again - still reads
+  // the task's real counts.
+  const shown = d ? shownStats(d) : null;
+  $("runs").textContent = shown ? shown.runs : "—";
   // Runs whose kept sparks met every requirement, out of the runs done.
   $("sparkmet").textContent = !d ? "—"
     : !d.spark_reroll_enabled ? "off"
-    : `${d.spark_goal_runs ?? 0} of ${d.loops_done ?? 0}`;
+    : `${shown.met} of ${shown.runs}`;
+  $("reset-stats").disabled = !d;
   $("limit").textContent = d ? (d.loop_count ? d.loop_count : "∞") : "—";
 
   // Start does nothing once the limit is reached: the scheduler leaves a task
@@ -1299,6 +1355,8 @@ $("delete").onclick = async () => {
     note("Could not delete the task: " + e.message, true);
   }
 };
+
+$("reset-stats").onclick = resetStats;
 
 refresh();
 setInterval(refresh, 2000);
