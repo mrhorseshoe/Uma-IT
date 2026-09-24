@@ -431,6 +431,17 @@ def run_frame(ctx) -> bool:
             log.info(f"Team trials: not on Home yet - backing out ({backs + 1})")
             ctx.ctrl.click_by_point(TT_BACK)
             return True
+        # Back is spent and not one screen has been recognised since the
+        # session began, so this is not a place a session can work from - most
+        # often the game is still coming up. Standing down hands the frames to
+        # the ordinary handlers, which know how to reach Home, and keeps the
+        # RP for the next loop.
+        #
+        # Waiting the quiet limit out instead cost 5.5 minutes on 24 Sep: six
+        # clicks at a loading screen, then four minutes of silence, during
+        # which the watchdog found the screen frozen and restarted the game.
+        _stand_down(ctx, "nothing recognised and Back did not reach Home")
+        return False
     if quiet > QUIET_LIMIT_SECONDS:
         _finish(ctx, f"nothing recognised for {round(quiet / 60)} min")
     elif now - career.tt_started_at > SESSION_LIMIT_SECONDS:

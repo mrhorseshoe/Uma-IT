@@ -245,6 +245,10 @@ tt.run_frame(ctx)
 check("it backs out towards Home", ctx.ctrl.clicks == [NAME(P.TT_BACK)],
       str(ctx.ctrl.clicks))
 for _ in range(tt.MAX_BACK_CLICKS + 2):
+    # Stop where the manifest stops: it only calls run_frame while a session is
+    # owed, and the last Back click is followed by a stand-down.
+    if not tt.active(ctx):
+        break
     ctx.career.tt_last_action_at = time.time() - tt.BACK_OUT_AFTER_SECONDS - 1
     tt.run_frame(ctx)
 check("  a bounded number of times, not forever",
@@ -341,6 +345,41 @@ check("  and stops owing a session", ctx.task.detail.tt_pending is False)
 check("  without ending the run", ctx.ended == [], str(ctx.ended))
 check("  and without marking the RP spent, so the next loop tries again",
       tt.due(ctx) is True)
+
+# 24 Sep: the loop was started while the game was still coming up. The session
+# ran first, recognised nothing, spent its six Back clicks at a loading screen
+# and then sat for the four-minute quiet limit - long enough for the watchdog
+# to call the screen frozen and restart the game. Standing down at the end of
+# the Back budget hands the frames to handlers that can get to Home.
+print("\na session that cannot find anything stands down instead of sitting")
+ctx = FakeCtx(team_trials_while_waiting=True)
+tt.image_match = lambda _img, _t: Found(False)
+claimed = True
+# One extra pass: the first frame of a session sets its own clocks, so it is
+# the second that can be quiet.
+for _ in range(tt.MAX_BACK_CLICKS + 2):
+    ctx.career.tt_last_action_at = time.time() - tt.BACK_OUT_AFTER_SECONDS - 1
+    claimed = tt.run_frame(ctx)
+check("it spends its Back budget first",
+      ctx.ctrl.clicks == [NAME(P.TT_BACK)] * tt.MAX_BACK_CLICKS, str(len(ctx.ctrl.clicks)))
+check("  then hands the frame back rather than claiming it", claimed is False, str(claimed))
+check("  stops owing a session", ctx.task.detail.tt_pending is False)
+check("  without ending the run", ctx.ended == [], str(ctx.ended))
+check("  and keeps the RP, so the next loop tries again",
+      ctx.task.detail.tt_last_empty_at == 0 and tt.due(ctx) is True,
+      str(ctx.task.detail.tt_last_empty_at))
+
+# A session that did recognise something and then got stuck is a different
+# case: it may be deep in the Race tab, where handing frames back is what cost
+# five hours on 19 Sep. That one still walks home and ends the run.
+print("\n  while one that got going still walks home when it stalls")
+ctx = FakeCtx(team_trials_while_waiting=True)
+only(T.REF_TT_HOME)
+tt.run_frame(ctx)
+tt.image_match = lambda _img, _t: Found(False)
+ctx.career.tt_last_action_at = time.time() - tt.QUIET_LIMIT_SECONDS - 1
+check("it keeps claiming the frame", tt.run_frame(ctx) is True)
+check("  and starts walking home", ctx.career.tt_returning is True)
 
 print("\na session is a run of its own, started before the career")
 ctx = FakeCtx(team_trials_while_waiting=True)
