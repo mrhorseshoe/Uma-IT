@@ -366,17 +366,25 @@ def run_frame(ctx) -> bool:
         except Exception as e:
             log.debug(f"team trials: countdown check failed: {e}")
 
-    # The game restarted under the session - the watchdog did it at 11:02 on
-    # 25 Sep, during the daily reset. Whatever the session was doing is gone,
-    # and the loading and title screens belong to handlers that know them: the
-    # title needs a tap, which a session never gives it. Standing down hands
-    # the frames over and keeps the RP for the next loop. Before this, the
-    # session sat on the title screen until its four-minute quiet limit.
+    # The title screen under a session means the game restarted - the
+    # watchdog did it at 11:02 on 25 Sep, during the daily reset. Whatever the
+    # session was doing is gone, and the title needs a tap a session never
+    # gives it, so the session stands down and keeps the RP for the next loop.
+    #
+    # The loading screen does *not* mean that. The game shows "Now Loading" on
+    # its own scene changes, including Race tab -> Team Trials: at 17:54:38 on
+    # 25 Sep a session stood down 1.7 seconds after reaching the Race tab,
+    # left the ordinary handlers on the Team Trials page they do not know, and
+    # the click guard reopened the game three times. So a loading screen is
+    # waited out - nothing clicked, and not counted as the session going quiet.
     try:
-        if image_match(img, UI_GAME_LOADING).find_match \
-                or image_match(img, UI_GAME_TITLE).find_match:
+        if image_match(img, UI_GAME_TITLE).find_match:
             _stand_down(ctx, "the game restarted under the session")
             return False
+        if image_match(img, UI_GAME_LOADING).find_match:
+            career.tt_last_action_at = now
+            time.sleep(1)
+            return True
     except Exception as e:
         log.debug(f"team trials: launch-screen check failed: {e}")
 

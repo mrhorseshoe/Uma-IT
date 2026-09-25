@@ -304,19 +304,34 @@ try:
 finally:
     tt._read_title, dialogs_rt._capture_unknown = real_title, real_capture
 
-# The watchdog's restart lands on the loading and title screens, which the
-# session cannot drive - the title needs a tap a session never gives.
-for screen in (T.UI_GAME_LOADING, T.UI_GAME_TITLE):
-    ctx = FakeCtx(team_trials_while_waiting=True)
-    only(T.REF_TT_HOME)
-    tt.run_frame(ctx)                    # the session gets going
-    ctx.ctrl.clicks.clear()
-    only(screen)
-    claimed = tt.run_frame(ctx)
-    check(f"a restart under the session ({screen.template_name}) ends it at once",
-          claimed is False and tt.active(ctx) is False, str((claimed, tt.active(ctx))))
-    check("  clicking nothing, and leaving the run to carry on",
-          ctx.ctrl.clicks == [] and ctx.ended == [], str((ctx.ctrl.clicks, ctx.ended)))
+# The watchdog's restart lands on the title screen, which the session cannot
+# drive - the title needs a tap a session never gives.
+ctx = FakeCtx(team_trials_while_waiting=True)
+only(T.REF_TT_HOME)
+tt.run_frame(ctx)                        # the session gets going
+ctx.ctrl.clicks.clear()
+only(T.UI_GAME_TITLE)
+claimed = tt.run_frame(ctx)
+check("the title screen under a session ends it at once",
+      claimed is False and tt.active(ctx) is False, str((claimed, tt.active(ctx))))
+check("  clicking nothing, and leaving the run to carry on",
+      ctx.ctrl.clicks == [] and ctx.ended == [], str((ctx.ctrl.clicks, ctx.ended)))
+
+# But "Now Loading" is also the game's own scene change - Race tab -> Team
+# Trials shows it. Standing down there on 25 Sep at 17:54 left the ordinary
+# handlers on the Team Trials page and cost three game reopens.
+ctx = FakeCtx(team_trials_while_waiting=True)
+only(T.REF_TT_TEAM_TRIALS)
+tt.run_frame(ctx)                        # on the Race tab, heading for Team Trials
+ctx.ctrl.clicks.clear()
+only(T.UI_GAME_LOADING)
+ctx.career.tt_last_action_at = time.time() - tt.QUIET_LIMIT_SECONDS - 1
+claimed = tt.run_frame(ctx)
+check("a loading screen inside the session is waited out, not taken as a restart",
+      claimed is True and tt.active(ctx) is True, str((claimed, tt.active(ctx))))
+check("  clicking nothing", ctx.ctrl.clicks == [], str(ctx.ctrl.clicks))
+check("  and not counted as the session going quiet",
+      time.time() - ctx.career.tt_last_action_at < 5 and not ctx.career.tt_returning)
 
 print("\nevery frame is claimed, matched or not")
 # The career handlers must never act on these screens - the bot is on the Race
