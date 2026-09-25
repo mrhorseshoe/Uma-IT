@@ -210,6 +210,7 @@ def _stand_down(ctx, why: str):
     career.tt_return_clicks = 0
     career.tt_returning = False
     career.tt_raced = False
+    career.tt_in_flow = False
     ctx.task.detail.tt_pending = False
     log.info(f"🏁 Team trials stood down ({why}) - the RP keeps until next time")
 
@@ -230,6 +231,7 @@ def _hand_back(ctx, why: str):
     career.tt_back_clicks = 0
     career.tt_return_clicks = 0
     career.tt_raced = False
+    career.tt_in_flow = False
     detail.tt_pending = False
     log.info(f"🏁 Team trials over ({reason}; {why})")
     ctx.task.end_task(TaskStatus.TASK_STATUS_FAILED, EndTaskReason.TEAM_TRIALS_DONE)
@@ -296,6 +298,18 @@ RULES = [
     ("the results", REF_TT_SEE_RESULTS, TT_SEE_RESULTS),
     ("the team result", REF_TT_NEXT_RESULT, TT_NEXT_RESULT),
 ]
+
+# Screens that exist only inside team trials. Seeing one means the session is
+# in its own flow.
+ENTERS_FLOW = {"the Race tab", "Team Trials", "the opponent list",
+               "the race screen", "the results", "the team result"}
+# Rules that are only safe once it is. REF_NEXT is a crop of a generic green
+# Next button, and the career setup screens have one too: on 25 Sep a session
+# that began on Support Formation matched it at 16:48:10, pressed Next into the
+# career setup, and - because any match also stopped the Back budget - had no
+# way out. The screen went still and the watchdog restarted the game. Inside
+# the flow the same rule is what gets through the race results.
+FLOW_ONLY = {"a Next button"}
 
 def _carat_pack(ctx):
     """Decline the Daily Carat Pack through the router's own handler."""
@@ -391,6 +405,8 @@ def run_frame(ctx) -> bool:
         return True
 
     for name, template, action in RULES:
+        if name in FLOW_ONLY and not getattr(career, 'tt_in_flow', False):
+            continue
         try:
             if not image_match(img, template).find_match:
                 continue
@@ -405,6 +421,8 @@ def run_frame(ctx) -> bool:
         # Past Home, so Back is no longer the way out of anything: the rules
         # know these screens, and backing out of a race would lose it.
         career.tt_raced = True
+        if name in ENTERS_FLOW:
+            career.tt_in_flow = True
         if callable(action):
             action(ctx)
         else:

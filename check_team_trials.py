@@ -93,13 +93,43 @@ for template, expected in [
     check(f"{NAME(expected)}", claimed and ctx.ctrl.clicks == [NAME(expected)],
           str(ctx.ctrl.clicks))
 
-# The results Next moves with its screen, so it is clicked where it was found.
+# The results Next moves with its screen, so it is clicked where it was found -
+# once the session is inside its own flow, which the opponent list proves.
 ctx = FakeCtx()
+only(T.REF_TT_SELECT_OPPONENT)
+tt.run_frame(ctx)
+ctx.ctrl.clicks.clear()
 only(T.REF_NEXT)
 tt.run_frame(ctx)
 check("the results Next is clicked where it was found, then confirmed",
       ctx.ctrl.clicks == [(300, 900, "Team trials - Next"), NAME(P.TT_NEXT_AFTER)],
       str(ctx.ctrl.clicks))
+
+# 25 Sep, 16:48: a session that began on Support Formation matched the generic
+# Next button there and pressed it into the career setup. The match also
+# switched off the Back budget, so it had no way out, and the watchdog
+# restarted the game. Before the session has seen a screen that exists only in
+# team trials, a Next button is none of its business.
+ctx = FakeCtx()
+only(T.REF_NEXT)
+tt.run_frame(ctx)
+check("a Next button before the session reaches team trials is not pressed",
+      ctx.ctrl.clicks == [], str(ctx.ctrl.clicks))
+check("  and does not use up the way back", ctx.career.tt_raced is False)
+ctx.career.tt_last_action_at = time.time() - tt.BACK_OUT_AFTER_SECONDS - 1
+tt.run_frame(ctx)
+check("  so the session backs out towards Home instead",
+      ctx.ctrl.clicks == [NAME(P.TT_BACK)], str(ctx.ctrl.clicks))
+
+# Home is not team trials - every setup screen is reached from it - so seeing
+# Home alone does not open the Next rule either.
+ctx = FakeCtx()
+only(T.REF_TT_HOME)
+tt.run_frame(ctx)
+check("Home does not count as being in the flow", ctx.career.tt_in_flow is False)
+only(T.REF_TT_TEAM_TRIALS)
+tt.run_frame(ctx)
+check("  the Race tab does", ctx.career.tt_in_flow is True)
 
 # A session begins wherever the loop was standing still - Home, or the career
 # start screens a declined TP prompt left the bot on. Back walks out of both,
