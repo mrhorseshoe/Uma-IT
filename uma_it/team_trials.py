@@ -73,6 +73,8 @@ from uma_it.asset.template import (
     REF_TT_SELECT_OPPONENT,
     REF_TT_TEAM_RACE,
     REF_TT_TEAM_TRIALS,
+    UI_GAME_LOADING,
+    UI_GAME_TITLE,
     UI_INDEPENDENT_TRAINING_WAIT,
     UI_INFO,
 )
@@ -350,6 +352,20 @@ def run_frame(ctx) -> bool:
         except Exception as e:
             log.debug(f"team trials: countdown check failed: {e}")
 
+    # The game restarted under the session - the watchdog did it at 11:02 on
+    # 25 Sep, during the daily reset. Whatever the session was doing is gone,
+    # and the loading and title screens belong to handlers that know them: the
+    # title needs a tap, which a session never gives it. Standing down hands
+    # the frames over and keeps the RP for the next loop. Before this, the
+    # session sat on the title screen until its four-minute quiet limit.
+    try:
+        if image_match(img, UI_GAME_LOADING).find_match \
+                or image_match(img, UI_GAME_TITLE).find_match:
+            _stand_down(ctx, "the game restarted under the session")
+            return False
+    except Exception as e:
+        log.debug(f"team trials: launch-screen check failed: {e}")
+
     if not getattr(career, 'tt_started_at', 0):
         career.tt_started_at = now
         career.tt_last_action_at = now
@@ -426,6 +442,10 @@ def run_frame(ctx) -> bool:
                 ctx.ctrl.click_by_point(action)
             return True
 
+    if title and _route_dialog(ctx, title):
+        career.tt_last_action_at = now
+        return True
+
     quiet = now - (getattr(career, 'tt_last_action_at', now) or now)
     if quiet > BACK_OUT_AFTER_SECONDS and not getattr(career, 'tt_raced', False):
         backs = getattr(career, 'tt_back_clicks', 0)
@@ -454,6 +474,49 @@ def run_frame(ctx) -> bool:
     elif now - career.tt_started_at > SESSION_LIMIT_SECONDS:
         _finish(ctx, "session ran long")
     return True
+
+
+# Router dialogs a session hands over when they land in the middle of it. Only
+# ones that can interrupt anything and mean the same thing wherever they do:
+# the daily reset, connectivity, and the pop-ups the bot already clears
+# elsewhere. The career dialogs stay out - 'Complete Career' or 'Confirm' mean
+# nothing on the Race tab, and a session must not press their points there.
+SESSION_ROUTED = {
+    'Date Changed', 'Notices', 'Network Error', 'Connection Error',
+    'Data Update', 'Data Download', 'Sparks', 'Perks', 'Borrow Card',
+    'Follow Trainer', 'Rewards Collected', 'Event Story Unlocked',
+}
+
+
+def _route_dialog(ctx, title: str) -> bool:
+    """Deal with a dialog the session's own rules do not name. True if handled.
+
+    A session claims every frame, so the dialog router never sees what lands
+    during one. On 25 Sep that was the daily reset: the session reached the
+    Race tab at 11:00:08, something came up over it, nothing handled it, and
+    the screen sat still until the watchdog restarted the game two minutes
+    later. Nothing was logged and nothing was photographed, because both of
+    those happen in the router.
+
+    So a dialog the router knows and that is safe here goes to the router's
+    own handler. One nobody knows is photographed and cleared the way the
+    router clears unknowns everywhere else - which is also what made the
+    'Sparks' and 'Daily Carat Pack' pictures possible. Career dialogs, and
+    titles the router deliberately leaves alone, are still left alone.
+    """
+    from uma_it import dialogs   # deferred: dialogs imports this module
+    from uma_it.asset.dialog_titles import ALL_TITLES
+    known = find_similar_text(title, ALL_TITLES, dialogs.MATCH_THRESHOLD)
+    if known in SESSION_ROUTED and known in dialogs.DIALOGS:
+        log.info(f"Team trials: {known!r} came up - handing it to the dialog router")
+        dialogs.DIALOGS[known](ctx)
+        return True
+    if not known:
+        log.warning(f"Team trials: unknown dialog {title!r} - photographing and clearing it")
+        dialogs._capture_unknown(ctx, title)
+        dialogs._escape(ctx, f"Unhandled dialog during team trials {title!r}")
+        return True
+    return False
 
 
 def _read_title(ctx, img) -> str:

@@ -227,6 +227,67 @@ try:
 finally:
     tt._read_title = real_title
 
+# 25 Sep, the daily reset: the session reached the Race tab at 11:00:08,
+# something came up over it, and nothing handled it - the session claims every
+# frame, so the dialog router never saw it. The watchdog restarted the game two
+# minutes later and the session then sat on the title screen until its quiet
+# limit. Six minutes lost, nothing logged, nothing photographed.
+print("\nthe daily reset during a session")
+import uma_it.dialogs as dialogs_rt
+from uma_it.asset.point import ESCAPE as _ESCAPE
+dialogs_rt.time.sleep = lambda *_: None
+real_title, real_capture = tt._read_title, dialogs_rt._capture_unknown
+photographed = []
+dialogs_rt._capture_unknown = lambda _ctx, raw: photographed.append(raw)
+try:
+    tt.image_match = lambda _img, _t: Found(False)
+
+    tt._read_title = lambda _ctx, _img: 'Date Changed'
+    ctx = FakeCtx(team_trials_while_waiting=True)
+    claimed = tt.run_frame(ctx)
+    check("'Date Changed' is handed to the router and confirmed",
+          claimed is True and ctx.ctrl.clicks == [(383, 840, "Date Changed - confirming")],
+          str(ctx.ctrl.clicks))
+    check("  and the session carries on", ctx.ended == [] and tt.active(ctx) is True)
+
+    tt._read_title = lambda _ctx, _img: 'Network Error'
+    ctx = FakeCtx(team_trials_while_waiting=True)
+    tt.run_frame(ctx)
+    check("so is a network error", len(ctx.ctrl.clicks) == 1, str(ctx.ctrl.clicks))
+
+    tt._read_title = lambda _ctx, _img: 'Some Dialog Nobody Has Seen'
+    ctx = FakeCtx(team_trials_while_waiting=True)
+    tt.run_frame(ctx)
+    check("a dialog nobody knows is photographed",
+          photographed == ['Some Dialog Nobody Has Seen'], str(photographed))
+    check("  and cleared the way the router clears unknowns",
+          ctx.ctrl.clicks == [NAME(_ESCAPE)], str(ctx.ctrl.clicks))
+
+    # Career dialogs mean nothing on the Race tab, and their click points are
+    # someone else's buttons there.
+    for title in ('Complete Career', 'Final Confirmation', 'Overwrite'):
+        tt._read_title = lambda _ctx, _img, _t=title: _t
+        ctx = FakeCtx(team_trials_while_waiting=True)
+        tt.run_frame(ctx)
+        check(f"a career dialog ({title!r}) is left alone", ctx.ctrl.clicks == [],
+              str(ctx.ctrl.clicks))
+finally:
+    tt._read_title, dialogs_rt._capture_unknown = real_title, real_capture
+
+# The watchdog's restart lands on the loading and title screens, which the
+# session cannot drive - the title needs a tap a session never gives.
+for screen in (T.UI_GAME_LOADING, T.UI_GAME_TITLE):
+    ctx = FakeCtx(team_trials_while_waiting=True)
+    only(T.REF_TT_HOME)
+    tt.run_frame(ctx)                    # the session gets going
+    ctx.ctrl.clicks.clear()
+    only(screen)
+    claimed = tt.run_frame(ctx)
+    check(f"a restart under the session ({screen.template_name}) ends it at once",
+          claimed is False and tt.active(ctx) is False, str((claimed, tt.active(ctx))))
+    check("  clicking nothing, and leaving the run to carry on",
+          ctx.ctrl.clicks == [] and ctx.ended == [], str((ctx.ctrl.clicks, ctx.ended)))
+
 print("\nevery frame is claimed, matched or not")
 # The career handlers must never act on these screens - the bot is on the Race
 # tab, where their points mean other things.
