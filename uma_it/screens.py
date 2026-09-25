@@ -18,7 +18,6 @@ from uma_it.asset.ui import (
     GAME_TITLE,
     # entering a career
     MAIN_MENU,
-    MAIN_MENU_2,
     CULTIVATE_SCENARIO_SELECT,
     CULTIVATE_UMAMUSUME_SELECT,
     CULTIVATE_EXTEND_UMAMUSUME_SELECT,
@@ -54,8 +53,8 @@ scan_ui_list = [
     GAME_LOADING,
     GAME_TITLE,
 
+    # Not MAIN_MENU_2: see its definition in asset/ui.py.
     MAIN_MENU,
-    MAIN_MENU_2,
     CULTIVATE_SCENARIO_SELECT,
     CULTIVATE_UMAMUSUME_SELECT,
     CULTIVATE_EXTEND_UMAMUSUME_SELECT,

@@ -8,8 +8,15 @@ from bot.base.resource import UI
 import uma_it.asset.template as template
 
 MAIN_MENU = UI("MAIN_MENU", [template.UI_MAIN_MENU], [])
-# Same name and same handler: two ways of seeing one screen, the way
-# CULTIVATE_RESULT already has three. Either match means Home.
+# **Not scanned - do not add it back to scan_ui_list as it stands.** A crop of
+# the Race and Scout tabs identifies "the Home tab is selected", not "this is
+# Home": Support Formation shows the same bottom nav with the same tab lit. On
+# 25 Sep, once 60b9127 made the crop live, Support Formation matched it too,
+# the executor took whichever thread finished first, and Home won. The Home
+# handler then pressed its fixed CAREER point, which on that screen is the
+# Perks button: the Perks panel opened, was cleared, and it went round 3,289
+# times from 12:05 until it was noticed. Kept defined so the crop and its
+# measurements are not lost; it needs a Home-only anchor before it can be used.
 MAIN_MENU_2 = UI("MAIN_MENU", [template.UI_MAIN_MENU_2], [])
 GAME_LOADING = UI("GAME_LOADING", [template.UI_GAME_LOADING], [])
 GAME_TITLE = UI("GAME_TITLE", [template.UI_GAME_TITLE], [])

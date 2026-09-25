@@ -122,10 +122,10 @@ class _Lock:
     detect_ui_results_write_lock = _threading.Lock()
 
 
-_SCREEN = {'GAME_LOADING': _GL, 'GAME_TITLE': _GT, 'MAIN_MENU_2': _MM2}
+_SCREEN = {'GAME_LOADING': _GL, 'GAME_TITLE': _GT}
 _FIX = {'game_loading_region': (380, 1180, UI_GAME_LOADING),
         'game_title_region':   (40, 820,   UI_GAME_TITLE),
-        'home_nav_region':     (500, 1160, UI_MAIN_MENU_2)}
+}
 _regions = {}
 for _name in _FIX:
     _regions[_name] = cv2.imread(f'resource/uma_it/fixture/{_name}.png', 0)
