@@ -20,12 +20,17 @@ UI_INFO = Template("INFO", UI_TEMPLATE_PATH)
 #
 # "Now Loading" is the text, not the comic panel above it, which rotates. The
 # title screen is matched on the game's logo rather than the key art behind it,
-# which rotates with events. Both crops carry their own search region, so a
-# frame that is neither costs two small correlations.
-UI_GAME_LOADING = Template("GAME_LOADING", UI_TEMPLATE_PATH,
-                           ImageMatchConfig(match_area=Area(380, 1180, 700, 1280)))
-UI_GAME_TITLE = Template("GAME_TITLE", UI_TEMPLATE_PATH,
-                         ImageMatchConfig(match_area=Area(40, 820, 700, 1000)))
+# which rotates with events.
+#
+# **No search region, on purpose.** A scanned screen's templates must search
+# the whole frame. The executor (`detect_ui_sub`) crops the frame to a
+# template's match_area and then hands the crop to `image_match`, which crops
+# to the same coordinates *again* - inside a 320x100 crop there is nothing at
+# x 380, so the match is empty and the screen can never be detected. These two
+# and UI_MAIN_MENU_2 shipped with regions in 5edfd36 and none of them fired
+# once in 24 hours. check_manifest.py now fails if a scanned template has one.
+UI_GAME_LOADING = Template("GAME_LOADING", UI_TEMPLATE_PATH)
+UI_GAME_TITLE = Template("GAME_TITLE", UI_TEMPLATE_PATH)
 UI_MAIN_MENU = Template("MAIN_MENU", UI_TEMPLATE_PATH)
 # A second way to recognise Home, because the first one has stopped working.
 # UI_MAIN_MENU is the bottom-nav Home tab, chosen because that tab "does not
@@ -42,8 +47,9 @@ UI_MAIN_MENU = Template("MAIN_MENU", UI_TEMPLATE_PATH)
 # screen beats 0.721. Kept alongside the old crop rather than replacing it -
 # either one matching is enough, and the old one is still calibrated for
 # whatever it does still match.
-UI_MAIN_MENU_2 = Template("MAIN_MENU_2", UI_TEMPLATE_PATH,
-                          ImageMatchConfig(match_area=Area(500, 1160, 720, 1280)))
+# Full frame, like every scanned template - see UI_GAME_LOADING for why a
+# search region here makes the screen undetectable.
+UI_MAIN_MENU_2 = Template("MAIN_MENU_2", UI_TEMPLATE_PATH)
 UI_CULTIVATE_SCENARIO_SELECT = Template("CULTIVATE_SCENARIO_SELECT", UI_TEMPLATE_PATH)
 UI_CULTIVATE_FOLLOW_SUPPORT_CARD_SELECT = Template("CULTIVATE_FOLLOW_SUPPORT_CARD_SELECT", UI_TEMPLATE_PATH)
 UI_CULTIVATE_SUPPORT_CARD_SELECT = Template("CULTIVATE_SUPPORT_CARD_SELECT", UI_TEMPLATE_PATH)

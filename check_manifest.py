@@ -79,6 +79,20 @@ collisions = {n: len(v) for n, v in names.items() if len(v) > 1}
 check("no two screens share a name, bar the crops of one screen",
       collisions == {"CULTIVATE_RESULT": 3, "MAIN_MENU": 2}, str(collisions))
 
+# The executor crops a frame to each template's match_area and image_match
+# then crops again with the same coordinates, so a scanned template with a
+# region is matched against an empty image and its screen is never detected.
+# Three templates shipped that way in 5edfd36 and fired zero times in a day.
+print("\nscanned templates search the whole frame")
+FULL = (0, 0, 720, 1280)
+regioned = []
+for u in manifest.ui_list:
+    for t in u.check_exist_template_list + u.check_non_exist_template_list:
+        a = t.image_match_config.match_area
+        if (a.x1, a.y1, a.x2, a.y2) != FULL:
+            regioned.append(f"{u.ui_name}/{t.template_name}")
+check("no scanned template carries a search region", not regioned, str(regioned))
+
 print("\nhandlers")
 handled = set(script_dicts.get(UmaItTaskType.CAREER, {}))
 unhandled = [u.ui_name for u in manifest.ui_list if u not in handled]

@@ -113,6 +113,16 @@ from uma_it.asset.template import UI_GAME_LOADING, UI_GAME_TITLE, UI_MAIN_MENU_2
 # negative check the template is correlated against the other regions directly:
 # a template that matches another of these would have the bot act on the wrong
 # screen at the one moment it has no idea where it is.
+import threading as _threading
+from bot.engine.executor import Executor as _Executor
+from uma_it.asset.ui import GAME_LOADING as _GL, GAME_TITLE as _GT, MAIN_MENU_2 as _MM2
+
+
+class _Lock:
+    detect_ui_results_write_lock = _threading.Lock()
+
+
+_SCREEN = {'GAME_LOADING': _GL, 'GAME_TITLE': _GT, 'MAIN_MENU_2': _MM2}
 _FIX = {'game_loading_region': (380, 1180, UI_GAME_LOADING),
         'game_title_region':   (40, 820,   UI_GAME_TITLE),
         'home_nav_region':     (500, 1160, UI_MAIN_MENU_2)}
@@ -127,8 +137,15 @@ for _name, (_x, _y, _tpl) in _FIX.items():
         continue
     _frame = np.zeros((1280, 720), np.uint8)
     _frame[_y:_y + _img.shape[0], _x:_x + _img.shape[1]] = _img
-    check(f"{_tpl.template_name} finds its own screen where it looks for it",
-          image_match(_frame, _tpl).find_match)
+    # Through the executor's own matcher, not image_match directly. The first
+    # version of this check called image_match and passed, while the executor
+    # - which crops to a template's region before image_match crops again -
+    # could not see these screens at all. Test the path the bot runs.
+    _found = []
+    _Executor.detect_ui_sub(_Lock(), _SCREEN[_tpl.template_name], _frame, _found)
+    check(f"{_tpl.template_name} is detected by the executor on its own screen",
+          [u.ui_name for u in _found] == [_SCREEN[_tpl.template_name].ui_name],
+          str([u.ui_name for u in _found]))
     for _other, _oimg in _regions.items():
         if _other == _name or _oimg is None:
             continue
