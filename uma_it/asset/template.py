@@ -31,8 +31,12 @@ UI_INFO = Template("INFO", UI_TEMPLATE_PATH)
 # once in 24 hours. check_manifest.py now fails if a scanned template has one.
 UI_GAME_LOADING = Template("GAME_LOADING", UI_TEMPLATE_PATH)
 UI_GAME_TITLE = Template("GAME_TITLE", UI_TEMPLATE_PATH)
+# No longer used: see MAIN_MENU in asset/ui.py. It matched 0 of 19 Home frames
+# on 19-25 Sep and 0.998 on Scenario Select.
 UI_MAIN_MENU = Template("MAIN_MENU", UI_TEMPLATE_PATH)
-# A second way to recognise Home, because the first one has stopped working.
+# The nav-bar crop Home is now recognised by, with the setup screens ruled out
+# in asset/ui.py. Its history: added as a second way to recognise Home, because
+# the first one had stopped working.
 # UI_MAIN_MENU is the bottom-nav Home tab, chosen because that tab "does not
 # change" - and then an event decorated it. Measured against three real Home
 # frames five days apart it scores 0.562, 0.715 and 0.784 against a threshold
@@ -44,9 +48,9 @@ UI_MAIN_MENU = Template("MAIN_MENU", UI_TEMPLATE_PATH)
 # This crop is the Race and Scout tabs at the bottom right, picked by diffing
 # those same three frames for a region that had not changed at all: mean
 # difference 0.00, and it scores 1.000 on all three while no other captured
-# screen beats 0.721. Kept alongside the old crop rather than replacing it -
-# either one matching is enough, and the old one is still calibrated for
-# whatever it does still match.
+# screen beats 0.721. One of those three frames turned out to be Support
+# Formation, mislabelled - which is why the region picked is one the two share,
+# and why on its own it matched Support Formation and pressed Perks 3,289 times.
 # Full frame, like every scanned template - see UI_GAME_LOADING for why a
 # search region here makes the screen undetectable.
 UI_MAIN_MENU_2 = Template("MAIN_MENU_2", UI_TEMPLATE_PATH)

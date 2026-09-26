@@ -7,17 +7,34 @@ the bot never sees a training screen, a race, an event choice or a goal dialog.
 from bot.base.resource import UI
 import uma_it.asset.template as template
 
-MAIN_MENU = UI("MAIN_MENU", [template.UI_MAIN_MENU], [])
-# **Not scanned - do not add it back to scan_ui_list as it stands.** A crop of
-# the Race and Scout tabs identifies "the Home tab is selected", not "this is
-# Home": Support Formation shows the same bottom nav with the same tab lit. On
-# 25 Sep, once 60b9127 made the crop live, Support Formation matched it too,
-# the executor took whichever thread finished first, and Home won. The Home
-# handler then pressed its fixed CAREER point, which on that screen is the
-# Perks button: the Perks panel opened, was cleared, and it went round 3,289
-# times from 12:05 until it was noticed. Kept defined so the crop and its
-# measurements are not lost; it needs a Home-only anchor before it can be used.
-MAIN_MENU_2 = UI("MAIN_MENU", [template.UI_MAIN_MENU_2], [])
+# Home: the bottom nav with the Home tab lit, and *not* a career setup screen or
+# a dialog on top of it.
+#
+# The nav bar alone cannot tell Home from the screens reached from it -
+# Scenario Select, Legacy Select and Support Formation all keep the Home tab
+# lit - and nothing on Home itself is both stable and Home's alone: measured
+# over 19 Home frames from 19-25 Sep, every region that stays still (team rank,
+# the TP bar) is on the other screens too, and everything that is Home's (the
+# trainee, the banners, the badges) keeps changing. So Home is the nav bar
+# *minus* the screens that share it, each recognised by its own template, which
+# is reliable where the nav bar is not: 1.000 on its own screen, at most 0.54
+# on any Home frame.
+#
+# What this replaced was broken both ways. The old crop of the Home tab matched
+# 0 of those 19 Home frames and scored 0.998 on Scenario Select, so the Home
+# handler ran on setup screens and pressed its fixed CAREER point there - the
+# Sparks button on Legacy Select, the Perks button on Support Formation, for
+# hours at a time. Verified through the executor's own matcher: all 19 Home
+# frames now resolve to MAIN_MENU, every setup capture to its own screen, a
+# dialog over Home to INFO, and none of 93 other captures to Home.
+MAIN_MENU = UI("MAIN_MENU", [template.UI_MAIN_MENU_2], [
+    template.UI_INFO,
+    template.UI_CULTIVATE_SCENARIO_SELECT,
+    template.UI_CULTIVATE_UMAMUSUME_SELECT,
+    template.UI_CULTIVATE_EXTEND_UMAMUSUME_SELECT,
+    template.UI_CULTIVATE_SUPPORT_CARD_SELECT,
+    template.UI_CULTIVATE_FOLLOW_SUPPORT_CARD_SELECT,
+])
 GAME_LOADING = UI("GAME_LOADING", [template.UI_GAME_LOADING], [])
 GAME_TITLE = UI("GAME_TITLE", [template.UI_GAME_TITLE], [])
 CULTIVATE_SCENARIO_SELECT = UI("CULTIVATE_SCENARIO_SELECT", [template.UI_CULTIVATE_SCENARIO_SELECT], [])

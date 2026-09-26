@@ -59,11 +59,16 @@ declared = {v for v in vars(asset_ui).values() if isinstance(v, UI)}
 # is where every restart lands - and the bot restarts the game itself.
 check("24 screens are scanned", len(manifest.ui_list) == 24, str(len(manifest.ui_list)))
 
-# The second Home crop matched Support Formation as well, and a Home handler on
-# that screen pressed Perks 3,289 times on 25 Sep. A screen reachable from Home
-# keeps the bottom nav, so a nav-bar crop can never tell them apart.
-from uma_it.asset.ui import MAIN_MENU_2 as _MM2
-check("the nav-bar Home crop is not scanned", _MM2 not in manifest.ui_list)
+# A nav-bar crop cannot tell Home from the screens reached from it: on 25 Sep a
+# Home handler on Support Formation pressed Perks 3,289 times, and one on Legacy
+# Select pressed Sparks for over an hour. Home has to rule those screens out.
+import uma_it.asset.template as _T
+from uma_it.asset.ui import MAIN_MENU as _HOME
+_ruled_out = set(_HOME.check_non_exist_template_list)
+for _t in (_T.UI_INFO, _T.UI_CULTIVATE_SCENARIO_SELECT, _T.UI_CULTIVATE_UMAMUSUME_SELECT,
+           _T.UI_CULTIVATE_EXTEND_UMAMUSUME_SELECT, _T.UI_CULTIVATE_SUPPORT_CARD_SELECT,
+           _T.UI_CULTIVATE_FOLLOW_SUPPORT_CARD_SELECT):
+    check(f"Home is ruled out when {_t.template_name} is on screen", _t in _ruled_out)
 check("no screen is listed twice", len(set(manifest.ui_list)) == len(manifest.ui_list))
 outside = [u.ui_name for u in manifest.ui_list if u not in declared]
 check("every scanned screen comes from this project's asset layer",

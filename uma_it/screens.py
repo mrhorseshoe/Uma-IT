@@ -53,7 +53,6 @@ scan_ui_list = [
     GAME_LOADING,
     GAME_TITLE,
 
-    # Not MAIN_MENU_2: see its definition in asset/ui.py.
     MAIN_MENU,
     CULTIVATE_SCENARIO_SELECT,
     CULTIVATE_UMAMUSUME_SELECT,

@@ -115,7 +115,7 @@ from uma_it.asset.template import UI_GAME_LOADING, UI_GAME_TITLE, UI_MAIN_MENU_2
 # screen at the one moment it has no idea where it is.
 import threading as _threading
 from bot.engine.executor import Executor as _Executor
-from uma_it.asset.ui import GAME_LOADING as _GL, GAME_TITLE as _GT, MAIN_MENU_2 as _MM2
+from uma_it.asset.ui import GAME_LOADING as _GL, GAME_TITLE as _GT, MAIN_MENU as _HOME
 
 
 class _Lock:
@@ -155,6 +155,24 @@ for _name, (_x, _y, _tpl) in _FIX.items():
         _score = float(cv2.matchTemplate(_oimg, _t, cv2.TM_CCOEFF_NORMED).max())
         check(f"  and scores under the threshold on {_other}", _score < 0.86,
               f"{_score:.3f}")
+
+# Home is the nav bar minus the screens that share it. Built from two real
+# fixtures: the nav bar off a Home frame, and Support Formation's title label.
+print("\nHome versus a setup screen, through the executor")
+_nav = cv2.imread('resource/uma_it/fixture/home_nav_region.png', 0)
+_sup = cv2.imread('resource/uma_it/fixture/support_title_region.png', 0)
+check("the Home fixtures load", _nav is not None and _sup is not None)
+if _nav is not None and _sup is not None:
+    _frame = np.zeros((1280, 720), np.uint8)
+    _frame[1160:1280, 500:720] = _nav
+    _found = []
+    _Executor.detect_ui_sub(_Lock(), _HOME, _frame, _found)
+    check("the nav bar alone is Home", _found == [_HOME], str([u.ui_name for u in _found]))
+    _frame[150:200, 0:260] = _sup
+    _found = []
+    _Executor.detect_ui_sub(_Lock(), _HOME, _frame, _found)
+    check("  the same nav bar under Support Formation's title is not",
+          _found == [], str([u.ui_name for u in _found]))
 
 print("\nthe loading screen, which must click nothing")
 # It is static for up to three and a half minutes. A tap per frame reaches the
