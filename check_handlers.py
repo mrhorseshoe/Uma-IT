@@ -177,6 +177,58 @@ check("it taps to start", ctx.ctrl.clicks and ctx.ctrl.clicks[0] == NAME(TITLE_T
 check("  a bounded number of times, short of the guard's eleven",
       len(ctx.ctrl.clicks) == enter.MAX_TITLE_TAPS < 11, str(len(ctx.ctrl.clicks)))
 
+# 25 Sep: out of daily legacy borrows. With use_last_parents the remembered
+# parent was a borrowed one, so the game left its slot reading "Select a
+# Legacy" and locked Next. The handler pressed the locked Next until the click
+# guard restarted the game, which came back to the same screen, for over an
+# hour. Nothing can start until the borrows reset, so the task stops.
+print("\nLegacy Select, out of daily borrows")
+_band = cv2.imread('resource/uma_it/fixture/legacy_empty_slot_band.png', 0)
+check("the empty-slot fixture loads", _band is not None)
+if _band is not None:
+    _frame = np.zeros((1280, 720), np.uint8)
+    _frame[740:860, :] = _band
+    check("an empty slot is read off the real frame", enter.legacy_slot_empty(_frame))
+    _frame[740:860, 160:345] = 0             # blank the empty slot's text
+    check("  and a frame without that text is not", not enter.legacy_slot_empty(_frame))
+
+from uma_it.task import EndTaskReason as _ItReason
+real_empty = enter.legacy_slot_empty
+try:
+    enter.legacy_slot_empty = lambda _img: True
+    ctx = FakeCtx(use_last_parents=True)
+    ended = []
+    ctx.task.end_task = lambda status, reason: ended.append(reason)
+    enter.script_extend_umamusume_select(ctx)
+    check("one frame of an empty slot only looks again",
+          ended == [] and ctx.ctrl.clicks == [], str((ended, ctx.ctrl.clicks)))
+    enter.script_extend_umamusume_select(ctx)
+    check("  a second stops the task, as out of legacy borrows",
+          ended == [_ItReason.NO_LEGACY_BORROWS], str(ended))
+    check("  without ever pressing the locked Next", ctx.ctrl.clicks == [],
+          str(ctx.ctrl.clicks))
+
+    # The auto-select flow fills empty slots itself, so without
+    # use_last_parents an empty slot is where it starts, not a dead end.
+    ctx = FakeCtx(use_last_parents=False)
+    ended = []
+    ctx.task.end_task = lambda status, reason: ended.append(reason)
+    enter.script_extend_umamusume_select(ctx)
+    enter.script_extend_umamusume_select(ctx)
+    check("without use_last_parents an empty slot is left to auto-select",
+          ended == [] and NAME(TO_CULTIVATE_PREPARE_AUTO_SELECT) in ctx.ctrl.clicks,
+          str((ended, ctx.ctrl.clicks[:1])))
+
+    enter.legacy_slot_empty = lambda _img: False
+    ctx = FakeCtx(use_last_parents=True)
+    ctx.career.legacy_empty_seen = 1         # a stale count from a passing frame
+    enter.script_extend_umamusume_select(ctx)
+    check("both slots filled presses Next as before",
+          ctx.ctrl.clicks == [NAME(TO_CULTIVATE_PREPARE_NEXT)], str(ctx.ctrl.clicks))
+    check("  and forgets the passing empty frame", ctx.career.legacy_empty_seen == 0)
+finally:
+    enter.legacy_slot_empty = real_empty
+
 print("\nHome, with the search stubbed")
 enter.find_green_button = lambda *_a: (543, 1112)
 ctx = FakeCtx()

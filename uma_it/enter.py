@@ -214,13 +214,66 @@ def script_umamusume_select(ctx):
     ctx.ctrl.click_by_point(TO_CULTIVATE_PREPARE_NEXT)
 
 
+# Legacy Select's two slots, where an empty one reads "Select a Legacy". Measured
+# on the frame captured on 25 Sep: the empty slot OCRs as exactly that, the
+# filled one as nothing, and no other captured screen produces the phrase.
+LEGACY_SLOT_TEXT = ((765, 830, 160, 345), (765, 830, 500, 685))   # y1, y2, x1, x2
+# Frames in a row that must show the empty slot before the loop is stopped, so
+# a slot that is still drawing when the screen appears cannot end the task.
+LEGACY_EMPTY_CONFIRM = 2
+
+
+def legacy_slot_empty(img) -> bool:
+    """True when either Legacy Select slot says "Select a Legacy".
+
+    Compared with the letters only, because OCR drops spaces: the banner above
+    the slots comes back as 'Pleaseselect twoLegacyUmamusume.'.
+    """
+    import re
+    from bot.recog.ocr import ocr_line
+    for y1, y2, x1, x2 in LEGACY_SLOT_TEXT:
+        text = re.sub(r'[^a-z]', '', (ocr_line(img[y1:y2, x1:x2]) or '').lower())
+        if 'selectalegacy' in text:
+            return True
+    return False
+
+
 def script_extend_umamusume_select(ctx):
     """The legacy (parents) picker.
 
     With `use_last_parents` the game's own memory is enough. Otherwise run the
     auto-select flow, which is four clicks in a fixed order.
+
+    **An empty slot with `use_last_parents` means the daily borrows are gone.**
+    The remembered parent was a borrowed one, and once the day's borrows are
+    used the game leaves its slot empty and locks Next. This handler used to
+    press the locked Next until the click guard restarted the game, which came
+    back to the same screen - on 25 Sep that ran for over an hour, and frames
+    misread as Home pressed the Sparks button beside it hundreds of times.
+    Nothing can start until the borrows reset, so the task stops instead.
+
+    Only with `use_last_parents`: the auto-select flow below fills empty slots
+    itself, so there an empty slot is the starting point, not a dead end.
     """
     if getattr(ctx.task.detail, 'use_last_parents', False):
+        career = ctx.career
+        img = ctx.ctrl.get_screen(to_gray=True)
+        if legacy_slot_empty(img):
+            seen = getattr(career, 'legacy_empty_seen', 0) + 1
+            career.legacy_empty_seen = seen
+            if seen >= LEGACY_EMPTY_CONFIRM:
+                log.warning("Legacy Select: a slot says 'Select a Legacy' and Next "
+                            "is locked - out of daily legacy borrows")
+                # This app's reasons, not the engine's EndTaskReason that the
+                # rest of this module imports.
+                from uma_it.task import EndTaskReason as ItReason
+                ctx.task.end_task(TaskStatus.TASK_STATUS_FAILED,
+                                  ItReason.NO_LEGACY_BORROWS)
+                return
+            log.info("Legacy Select: a legacy slot looks empty - checking again")
+            time.sleep(1)
+            return
+        career.legacy_empty_seen = 0
         ctx.ctrl.click_by_point(TO_CULTIVATE_PREPARE_NEXT)
         return
     for point in (TO_CULTIVATE_PREPARE_AUTO_SELECT,

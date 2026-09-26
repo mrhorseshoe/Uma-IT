@@ -88,6 +88,8 @@ class CareerContext:
         # the title screen. Run-scoped: a restart is exactly when both should
         # start again from zero.
         self.loading_logged: bool = False
+        # Frames in a row that showed an empty Legacy Select slot.
+        self.legacy_empty_seen: int = 0
         self.title_taps: int = 0
 
         # -- team trials, which run between careers ---------------------------

@@ -162,6 +162,7 @@ class EndTaskReason(Enum):
     TP_WAIT = "Waiting for TP to regenerate"
     TEAM_TRIALS_DONE = "Team trials finished; on to the next career"
     STOP_AT_SPARK_REROLL = "Stopped at the spark reroll screen"
+    NO_LEGACY_BORROWS = "A legacy slot is empty - out of daily legacy borrows"
 
 
 class UmaItTaskType(Enum):
@@ -196,7 +197,17 @@ class UmaItTask(Task):
         """
         try:
             detail = getattr(self, 'detail', None)
-            if detail is not None and reason is EndTaskReason.TEAM_TRIALS_DONE:
+            if detail is not None and reason is EndTaskReason.NO_LEGACY_BORROWS:
+                # Not a failed career and not a run: nothing started. But
+                # nothing will start until the borrows reset either, and
+                # retrying is what looped the bot on the Legacy Select screen.
+                # So the loop stops, and stays stopped across the restart.
+                log.error("Legacy Select has an empty slot and Next is locked - "
+                          "the daily legacy borrows have run out. Stopping the "
+                          "loop; start it again once the borrows reset.")
+                from bot.engine.scheduler import scheduler
+                scheduler.stop()
+            elif detail is not None and reason is EndTaskReason.TEAM_TRIALS_DONE:
                 # Neither a career nor an attempt at one: the loop filled a gap
                 # in the TP wait, which still stands and still holds it back.
                 pass

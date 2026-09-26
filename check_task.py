@@ -180,6 +180,21 @@ check("a task saved before the field existed restores with no requirement",
 # The 3* override is blue-only by design, and the coercion is where that is
 # enforced. A pink name stored here would be a setting that reads as configured
 # on the dashboard and can never fire, because the check only reads blue rows.
+# Out of legacy borrows is neither a run nor a failure - nothing started - but
+# nothing will start until the borrows reset, so the loop has to stop and stay
+# stopped across the soft restart.
+print("\nrunning out of legacy borrows stops the loop")
+from bot.engine.scheduler import scheduler as _sched
+_was = _sched.active
+_sched.active = True
+_t = build_task(LOOP, 1, "legacy", None, dict(REAL, loops_done=4, consecutive_failures=0))
+_t.end_task(TaskStatus.TASK_STATUS_FAILED, UmaItEndReason.NO_LEGACY_BORROWS)
+check("the scheduler is stopped", _sched.active is False, str(_sched.active))
+check("  no run is counted", _t.detail.loops_done == 4, str(_t.detail.loops_done))
+check("  and it is not a failure", _t.detail.consecutive_failures == 0,
+      str(_t.detail.consecutive_failures))
+_sched.active = _was
+
 print("\nthe 3* blue override is coerced to blue sparks")
 t9a = build_task(LOOP, 1, "sparks", None,
                  dict(REAL, spark_keep_3star=['Stamina', 'power']))
