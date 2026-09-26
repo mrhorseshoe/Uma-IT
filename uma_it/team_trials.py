@@ -237,14 +237,47 @@ def _hand_back(ctx, why: str):
     ctx.task.end_task(TaskStatus.TASK_STATUS_FAILED, EndTaskReason.TEAM_TRIALS_DONE)
 
 
-def _save_debug(ctx, tag: str):
-    """Keep the frame a session gave up on, the way spark reroll does."""
+def _save_debug(ctx, tag: str) -> str:
+    """Keep the frame a session gave up on, the way spark reroll does.
+
+    Returns the path written, or '' when the capture failed.
+    """
     try:
         os.makedirs('screenshot/team_trials', exist_ok=True)
-        cv2.imwrite(f'screenshot/team_trials/{time.strftime("%Y%m%d_%H%M%S")}_{tag}.png',
-                    ctx.ctrl.get_screen())
+        path = f'screenshot/team_trials/{time.strftime("%Y%m%d_%H%M%S")}_{tag}.png'
+        cv2.imwrite(path, ctx.ctrl.get_screen())
+        return path
     except Exception as e:
         log.debug(f"team trials capture failed: {e}")
+        return ''
+
+
+# A session that has recognised nothing for this long is photographed once,
+# while the screen is still the one it is stuck on. It has to come before the
+# watchdog, which restarts the game after 90 seconds of a still screen - on
+# 26 Sep at 02:41 a session stalled after a race, the watchdog restarted the
+# game, and the only capture the session makes, at its four-minute quiet
+# limit, never happened. So nobody knows what that screen was.
+STUCK_CAPTURE_SECONDS = 45
+# Per process, which restarts after every run: enough to identify a screen.
+MAX_STUCK_CAPTURES = 3
+_stuck_captures = 0
+
+
+def _capture_stuck(ctx, quiet: float):
+    """Photograph the screen a session is stuck on, once per quiet spell."""
+    global _stuck_captures
+    career = ctx.career
+    if _stuck_captures >= MAX_STUCK_CAPTURES:
+        return
+    # Once per spell: an action since the last capture starts a new one.
+    if getattr(career, 'tt_stuck_captured_at', 0.0) >= getattr(career, 'tt_last_action_at', 0.0):
+        return
+    career.tt_stuck_captured_at = time.time()
+    _stuck_captures += 1
+    path = _save_debug(ctx, "stuck")
+    if path:
+        log.info(f"Team trials: nothing recognised for {round(quiet)}s - kept the screen at {path}")
 
 
 def _out_of_rp(ctx):
@@ -473,6 +506,8 @@ def run_frame(ctx) -> bool:
         return True
 
     quiet = now - (getattr(career, 'tt_last_action_at', now) or now)
+    if quiet >= STUCK_CAPTURE_SECONDS:
+        _capture_stuck(ctx, quiet)
     if quiet > BACK_OUT_AFTER_SECONDS and not getattr(career, 'tt_raced', False):
         backs = getattr(career, 'tt_back_clicks', 0)
         if backs < MAX_BACK_CLICKS:

@@ -20,6 +20,10 @@ from uma_it.task import build_task, EndTaskReason
 from bot.base.task import TaskExecuteMode, TaskStatus
 
 tt.time.sleep = lambda *_: None
+# Captures are recorded, not written. Until this line existed every run that
+# reached the quiet limit left an all-black frame in screenshot/team_trials/ -
+# fifty of them by 26 Sep, mixed in with the five real captures.
+tt._save_debug = lambda _ctx, tag: f'screenshot/team_trials/test_{tag}.png'
 dialogs.time.sleep = lambda *_: None
 failures = []
 NAME = lambda p: getattr(p, 'desc', p)
@@ -332,6 +336,53 @@ check("a loading screen inside the session is waited out, not taken as a restart
 check("  clicking nothing", ctx.ctrl.clicks == [], str(ctx.ctrl.clicks))
 check("  and not counted as the session going quiet",
       time.time() - ctx.career.tt_last_action_at < 5 and not ctx.career.tt_returning)
+
+# 26 Sep, 02:41: a session stalled after a race, the watchdog restarted the
+# game at 90 seconds, and the session's only capture - at its four-minute quiet
+# limit - never happened. So a stuck session now photographs its screen at 45
+# seconds, once per stall, before the watchdog can take the screen away.
+print("\na stuck session photographs its screen before the watchdog")
+taken = []
+real_save = tt._save_debug
+tt._save_debug = lambda _ctx, tag: taken.append(tag) or f'screenshot/team_trials/x_{tag}.png'
+tt._stuck_captures = 0
+try:
+    ctx = FakeCtx(team_trials_while_waiting=True)
+    only(T.REF_TT_SELECT_OPPONENT)
+    tt.run_frame(ctx)                    # in the flow, so no Back clicks
+    tt.image_match = lambda _img, _t: Found(False)
+    ctx.career.tt_last_action_at = time.time() - 20
+    tt.run_frame(ctx)
+    check("twenty quiet seconds is a race, not a stall", taken == [], str(taken))
+    ctx.career.tt_last_action_at = time.time() - tt.STUCK_CAPTURE_SECONDS - 1
+    tt.run_frame(ctx)
+    check("past the threshold the screen is photographed", taken == ['stuck'], str(taken))
+    tt.run_frame(ctx)
+    check("  once per stall, not once a frame", taken == ['stuck'], str(taken))
+    check("  well before the watchdog's 90 seconds", tt.STUCK_CAPTURE_SECONDS < 90)
+    check("  and nothing is clicked for it", ctx.ctrl.clicks == [NAME(P.TT_SELECT_OPPONENT)],
+          str(ctx.ctrl.clicks))
+
+    only(T.REF_TT_SEE_ALL)
+    tt.run_frame(ctx)                    # the session gets moving again
+    tt.image_match = lambda _img, _t: Found(False)
+    # Keep the real order of events while jumping the clock: the earlier
+    # picture, then the progress, then 45 quiet seconds.
+    ctx.career.tt_stuck_captured_at = time.time() - 200
+    ctx.career.tt_last_action_at = time.time() - tt.STUCK_CAPTURE_SECONDS - 1
+    tt.run_frame(ctx)
+    check("a fresh stall after progress gets its own picture",
+          taken == ['stuck', 'stuck'], str(taken))
+
+    for _ in range(5):
+        ctx.career.tt_last_action_at = time.time()
+        ctx.career.tt_stuck_captured_at = 0
+        ctx.career.tt_last_action_at = time.time() - tt.STUCK_CAPTURE_SECONDS - 1
+        tt.run_frame(ctx)
+    check("  at most a few per run", len(taken) == tt.MAX_STUCK_CAPTURES, str(len(taken)))
+finally:
+    tt._save_debug = real_save
+    tt._stuck_captures = 0
 
 print("\nevery frame is claimed, matched or not")
 # The career handlers must never act on these screens - the bot is on the Race

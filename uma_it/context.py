@@ -106,6 +106,9 @@ class CareerContext:
         # Until it has, the generic Next rule is off: career setup screens
         # have a Next button too.
         self.tt_in_flow: bool = False
+        # When the session last photographed a screen it was stuck on; one
+        # capture per quiet spell.
+        self.tt_stuck_captured_at: float = 0.0
         # Walking back to Home once the session is over. The frames stay
         # claimed until Home is on screen: handing them back on a Race tab
         # screen is what cost five hours on 19 Sep.
