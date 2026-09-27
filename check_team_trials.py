@@ -90,6 +90,7 @@ for template, expected in [
     (T.REF_TT_SEE_ALL, P.TT_SEE_ALL),
     (T.REF_TT_SEE_RESULTS, P.TT_SEE_RESULTS),
     (T.REF_TT_NEXT_RESULT, P.TT_NEXT_RESULT),
+    (T.REF_TT_HIGH_SCORE, P.TT_HIGH_SCORE_TAP),
 ]:
     ctx = FakeCtx()
     only(template)
@@ -383,6 +384,29 @@ try:
 finally:
     tt._save_debug = real_save
     tt._stuck_captures = 0
+
+# 26 Sep, 22:04: a race beat the best score, the game showed "NEW HIGH SCORE!"
+# with a TAP prompt, and no rule knew it. Matched here against the real frame.
+print("\nthe new high score splash, against real pixels")
+import cv2 as _cv2
+import numpy as _np
+from bot.recog.image_matcher import image_match as _real_match
+_band = _cv2.imread('resource/uma_it/fixture/tt_high_score_band.png', 0)
+check("the high score fixture loads", _band is not None)
+if _band is not None:
+    _frame = _np.zeros((1280, 720), _np.uint8)
+    _frame[380:480, :] = _band
+    ctx = FakeCtx(team_trials_while_waiting=True)
+    ctx.ctrl.get_screen = lambda to_gray=False, _f=_frame: _f
+    tt.image_match = _real_match
+    tt.run_frame(ctx)
+    check("the splash is tapped through", ctx.ctrl.clicks == [NAME(P.TT_HIGH_SCORE_TAP)],
+          str(ctx.ctrl.clicks))
+    _frame[380:480, :] = 0
+    ctx = FakeCtx(team_trials_while_waiting=True)
+    ctx.ctrl.get_screen = lambda to_gray=False, _f=_frame: _f
+    tt.run_frame(ctx)
+    check("  and nothing is tapped without it", ctx.ctrl.clicks == [], str(ctx.ctrl.clicks))
 
 print("\nevery frame is claimed, matched or not")
 # The career handlers must never act on these screens - the bot is on the Race

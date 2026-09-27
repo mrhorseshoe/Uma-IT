@@ -98,6 +98,11 @@ REF_TT_SELECT_OPPONENT = Template("tt_select_opp", REF_TEMPLATE_PATH)
 REF_TT_SEE_ALL = Template("tt_see_all", REF_TEMPLATE_PATH)
 REF_TT_SEE_RESULTS = Template("tt_see_results", REF_TEMPLATE_PATH)
 REF_TT_NEXT_RESULT = Template("tt_next2", REF_TEMPLATE_PATH)
+# The "NEW HIGH SCORE!" splash after a race that beats your best, with a TAP
+# prompt. Cropped from the frame the stuck-session capture kept on 26 Sep at
+# 22:04: the lettering only, not the blurred race behind it. 1.000 on that
+# frame, at most 0.419 on 194 other captures.
+REF_TT_HIGH_SCORE = Template("tt_high_score", REF_TEMPLATE_PATH)
 # "You have no RP" - the session's expected end. Both are searched inside the
 # region they occupy, because the crops are small enough to turn up elsewhere.
 # The countdown screen's menu holds "To Home" - and "Give Up", which abandons

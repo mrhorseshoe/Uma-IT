@@ -66,6 +66,8 @@ TT_SEE_ALL = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordi
 TT_NEXT_AFTER = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(508, 896), "Team trials - confirm after Next", None)
 TT_SEE_RESULTS = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(514, 1208), "Team trials - See Results", None)
 TT_NEXT_RESULT = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(393, 1183), "Team trials - Next result", None)
+# The TAP prompt under the high score splash, where its OCR reads 'TAP'.
+TT_HIGH_SCORE_TAP = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(360, 1092), "Team trials - new high score, tap", None)
 TT_DONE = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(355, 1200), "Team trials - leave", None)
 TT_ITEMS_SELECTED_OK = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(610, 908), "Team trials - Items Selected OK", None)
 # The game's own Back button, bottom left of the career-start screens. A

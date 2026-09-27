@@ -54,6 +54,7 @@ from uma_it.asset.point import (
     TT_DONE,
     TT_ITEMS_SELECTED_OK,
     TT_NEXT_AFTER,
+    TT_HIGH_SCORE_TAP,
     TT_NEXT_RESULT,
     TT_RACE_TAB,
     TT_SEE_ALL,
@@ -66,6 +67,7 @@ from uma_it.asset.template import (
     REF_NEXT,
     REF_TT_CANT,
     REF_TT_CANT_2,
+    REF_TT_HIGH_SCORE,
     REF_TT_HOME,
     REF_TT_NEXT_RESULT,
     REF_TT_SEE_ALL,
@@ -327,6 +329,11 @@ RULES = [
     ("Team Trials", REF_TT_TEAM_RACE, TT_TEAM_RACE),
     ("the opponent list", REF_TT_SELECT_OPPONENT, TT_SELECT_OPPONENT),
     ("the race screen", REF_TT_SEE_ALL, TT_SEE_ALL),
+    # Only after a race that beats your best, so it can go weeks unseen. On
+    # 26 Sep at 22:04 nothing knew it: the session sat on it until the
+    # watchdog restarted the game, and the rest of that session's RP went
+    # unspent. The stuck-session capture is what made this rule possible.
+    ("a new high score", REF_TT_HIGH_SCORE, TT_HIGH_SCORE_TAP),
     ("a Next button", REF_NEXT, _next_sequence),
     ("the results", REF_TT_SEE_RESULTS, TT_SEE_RESULTS),
     ("the team result", REF_TT_NEXT_RESULT, TT_NEXT_RESULT),
@@ -335,7 +342,8 @@ RULES = [
 # Screens that exist only inside team trials. Seeing one means the session is
 # in its own flow.
 ENTERS_FLOW = {"the Race tab", "Team Trials", "the opponent list",
-               "the race screen", "the results", "the team result"}
+               "the race screen", "the results", "the team result",
+               "a new high score"}
 # Rules that are only safe once it is. REF_NEXT is a crop of a generic green
 # Next button, and the career setup screens have one too: on 25 Sep a session
 # that began on Support Formation matched it at 16:48:10, pressed Next into the
