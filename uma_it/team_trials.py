@@ -68,6 +68,7 @@ from uma_it.asset.template import (
     REF_TT_CANT,
     REF_TT_CANT_2,
     REF_TT_HIGH_SCORE,
+    REF_TT_TALLYING,
     REF_TT_HOME,
     REF_TT_NEXT_RESULT,
     REF_TT_SEE_ALL,
@@ -97,6 +98,10 @@ MAX_BACK_CLICKS = 6
 MAX_RETURN_CLICKS = 8
 # Five RP is the cap, and a race plus its result screens runs a few minutes.
 SESSION_LIMIT_SECONDS = 1500
+# One rule matching this many frames in a row is a click that does nothing.
+# Short of the click guard's eleven, so the session ends before the game is
+# reopened. No healthy session repeats a rule more than two or three times.
+MAX_SAME_RULE = 8
 
 
 # RP comes back one point every 90 minutes and caps at 5, so there is no sense
@@ -190,7 +195,7 @@ def _finish(ctx, why: str):
     # A session that ends without the game saying no was looking at something
     # the rules do not name. Keep the frame: on 19 Sep one sat four minutes on
     # a screen nobody can now identify, because nothing captured it.
-    if not why.startswith("out of RP"):
+    if not why.startswith(("out of RP", "team trials are tallying")):
         _save_debug(ctx, "unrecognised")
 
 
@@ -213,6 +218,8 @@ def _stand_down(ctx, why: str):
     career.tt_returning = False
     career.tt_raced = False
     career.tt_in_flow = False
+    career.tt_last_rule = ''
+    career.tt_rule_repeats = 0
     ctx.task.detail.tt_pending = False
     log.info(f"🏁 Team trials stood down ({why}) - the RP keeps until next time")
 
@@ -234,6 +241,8 @@ def _hand_back(ctx, why: str):
     career.tt_return_clicks = 0
     career.tt_raced = False
     career.tt_in_flow = False
+    career.tt_last_rule = ''
+    career.tt_rule_repeats = 0
     detail.tt_pending = False
     log.info(f"🏁 Team trials over ({reason}; {why})")
     ctx.task.end_task(TaskStatus.TASK_STATUS_FAILED, EndTaskReason.TEAM_TRIALS_DONE)
@@ -282,6 +291,23 @@ def _capture_stuck(ctx, quiet: float):
         log.info(f"Team trials: nothing recognised for {round(quiet)}s - kept the screen at {path}")
 
 
+def _tallying(ctx):
+    """Team Trials is being tallied: no races today, so end the session.
+
+    Once a week the game tallies the results and greys out Team Race for
+    hours. On 28 Sep a session found the page, recognised it as Team Trials,
+    and pressed the disabled Team Race every 1.6 seconds from 06:23 until
+    16:35: 20,196 presses and 1,835 game reopens by the click guard, with no
+    career in between, because RP was full and every new loop tried again.
+
+    Ended the way running out of RP ends: RP counts as tried, so the next
+    attempt is RP_RETRY_SECONDS away and the careers carry on meanwhile.
+    """
+    log.info("Team trials are being tallied - no races until that ends; "
+             "trying again later")
+    _finish(ctx, "team trials are tallying")
+
+
 def _out_of_rp(ctx):
     """The game says there is no RP left: leave the screen and end the session."""
     ctx.ctrl.click_by_point(TT_DONE)
@@ -326,6 +352,10 @@ RULES = [
     ("no RP left (2)", REF_TT_CANT_2, _out_of_rp),
     ("Home", REF_TT_HOME, TT_RACE_TAB),
     ("the Race tab", REF_TT_TEAM_TRIALS, TT_TEAM_TRIALS),
+    # Before "Team Trials": the tallying page is that page, with Team Race
+    # greyed out, so the Team Trials rule matches it too and presses a button
+    # that does nothing.
+    ("the tallying period", REF_TT_TALLYING, lambda ctx: _tallying(ctx)),
     ("Team Trials", REF_TT_TEAM_RACE, TT_TEAM_RACE),
     ("the opponent list", REF_TT_SELECT_OPPONENT, TT_SELECT_OPPONENT),
     ("the race screen", REF_TT_SEE_ALL, TT_SEE_ALL),
@@ -434,6 +464,14 @@ def run_frame(ctx) -> bool:
         career.tt_last_action_at = now
         log.info("🏁 Team trials: spending RP before the next career")
 
+    # The cap on a whole session, checked on every frame. It used to sit at
+    # the bottom of this function, behind the rules - so a session that kept
+    # matching a screen never reached it. On 28 Sep that was ten hours.
+    if (not getattr(career, 'tt_returning', False)
+            and now - career.tt_started_at > SESSION_LIMIT_SECONDS):
+        _finish(ctx, "session ran long")
+        return True
+
     # Walking back to Home after the session ended. Bounded: if the Home tab
     # does not get there, hand back anyway rather than click on forever.
     if getattr(career, 'tt_returning', False):
@@ -466,6 +504,17 @@ def run_frame(ctx) -> bool:
         # that does nothing looks identical to one that raced: on 19 Sep four
         # minutes of silence could have been any step of the flow.
         log.info(f"Team trials: on {name}")
+        # The same rule over and over means its click is not moving anything:
+        # a greyed-out button, a screen that ignores taps. End the session
+        # before the click guard's eleven identical clicks reopen the game -
+        # which only puts it back on the same screen.
+        if name == getattr(career, 'tt_last_rule', ''):
+            career.tt_rule_repeats = getattr(career, 'tt_rule_repeats', 0) + 1
+        else:
+            career.tt_last_rule, career.tt_rule_repeats = name, 1
+        if career.tt_rule_repeats >= MAX_SAME_RULE:
+            _finish(ctx, f"stuck on {name} ({career.tt_rule_repeats} presses without progress)")
+            return True
         career.tt_last_action_at = now
         # Past Home, so Back is no longer the way out of anything: the rules
         # know these screens, and backing out of a race would lose it.

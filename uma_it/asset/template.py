@@ -103,6 +103,11 @@ REF_TT_NEXT_RESULT = Template("tt_next2", REF_TEMPLATE_PATH)
 # 22:04: the lettering only, not the blurred race behind it. 1.000 on that
 # frame, at most 0.419 on 194 other captures.
 REF_TT_HIGH_SCORE = Template("tt_high_score", REF_TEMPLATE_PATH)
+# "TALLYING" on the Team Trials page: once a week the results are tallied and
+# Team Race is greyed out for hours. Cropped from the live page on 28 Sep - the
+# lettering only. 1.000 on that frame, at most 0.448 on 205 other captures,
+# the ordinary Team Trials page among them.
+REF_TT_TALLYING = Template("tt_tallying", REF_TEMPLATE_PATH)
 # "You have no RP" - the session's expected end. Both are searched inside the
 # region they occupy, because the crops are small enough to turn up elsewhere.
 # The countdown screen's menu holds "To Home" - and "Give Up", which abandons

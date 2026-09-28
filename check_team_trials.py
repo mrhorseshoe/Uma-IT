@@ -408,6 +408,65 @@ if _band is not None:
     tt.run_frame(ctx)
     check("  and nothing is tapped without it", ctx.ctrl.clicks == [], str(ctx.ctrl.clicks))
 
+# 28 Sep: the weekly tally greys out Team Race for hours. A session found the
+# page, matched it as Team Trials, and pressed the dead button from 06:23 to
+# 16:35 - 20,196 presses, 1,835 game reopens, no careers.
+print("\nthe weekly tally, against real pixels")
+_tband = _cv2.imread('resource/uma_it/fixture/tt_tallying_band.png', 0)
+check("the tallying fixture loads", _tband is not None)
+if _tband is not None:
+    _frame = _np.zeros((1280, 720), _np.uint8)
+    _frame[440:560, :] = _tband
+    ctx = FakeCtx(team_trials_while_waiting=True)
+    ctx.ctrl.get_screen = lambda to_gray=False, _f=_frame: _f
+    tt.image_match = _real_match
+    tt.run_frame(ctx)
+    check("the tallying page ends the session", ctx.career.tt_returning is True,
+          str(ctx.career.tt_returning))
+    check("  without pressing the greyed-out Team Race", ctx.ctrl.clicks == [],
+          str(ctx.ctrl.clicks))
+    check("  and counts the RP as tried, so the careers carry on",
+          ctx.task.detail.tt_last_empty_at > 0 and tt.due(ctx) is False)
+
+# Whatever the screen: a rule that matches over and over is a click that does
+# nothing. In every real session in the logs no rule has repeated more than
+# twice; the tally loop repeated one 20,274 times.
+print("\na rule that keeps matching ends the session")
+ctx = FakeCtx(team_trials_while_waiting=True)
+only(T.REF_TT_TEAM_RACE)
+for _ in range(tt.MAX_SAME_RULE + 3):
+    tt.run_frame(ctx)
+    if ctx.career.tt_returning:
+        break
+check("the session ends once the same rule has matched MAX_SAME_RULE times",
+      ctx.career.tt_returning is True, str(ctx.career.tt_returning))
+check("  having pressed fewer times than the click guard's eleven",
+      ctx.ctrl.clicks.count(NAME(P.TT_TEAM_RACE)) < 11,
+      str(ctx.ctrl.clicks.count(NAME(P.TT_TEAM_RACE))))
+check("  and a limit above anything a healthy session does",
+      2 < tt.MAX_SAME_RULE < 11, str(tt.MAX_SAME_RULE))
+
+ctx = FakeCtx(team_trials_while_waiting=True)
+for template in (T.REF_TT_SELECT_OPPONENT, T.REF_TT_SELECT_OPPONENT, T.REF_TT_SEE_ALL,
+                 T.REF_TT_SEE_ALL, T.REF_TT_NEXT_RESULT, T.REF_TT_TEAM_RACE):
+    only(template)
+    tt.run_frame(ctx)
+check("  while a normal flow with the odd double is left alone",
+      ctx.career.tt_returning is False, str(ctx.career.tt_returning))
+
+# The whole-session cap used to sit behind the rules, so a session that kept
+# recognising something never reached it.
+print("\nthe session cap holds while rules keep matching")
+ctx = FakeCtx(team_trials_while_waiting=True)
+only(T.REF_TT_SELECT_OPPONENT)
+tt.run_frame(ctx)
+ctx.career.tt_started_at = time.time() - tt.SESSION_LIMIT_SECONDS - 1
+ctx.ctrl.clicks.clear()
+tt.run_frame(ctx)
+check("a session past its cap ends even on a screen it recognises",
+      ctx.career.tt_returning is True and ctx.ctrl.clicks == [],
+      str((ctx.career.tt_returning, ctx.ctrl.clicks)))
+
 print("\nevery frame is claimed, matched or not")
 # The career handlers must never act on these screens - the bot is on the Race
 # tab, where their points mean other things.

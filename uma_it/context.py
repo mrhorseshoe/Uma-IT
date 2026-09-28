@@ -109,6 +109,9 @@ class CareerContext:
         # When the session last photographed a screen it was stuck on; one
         # capture per quiet spell.
         self.tt_stuck_captured_at: float = 0.0
+        # The last rule the session matched and how many times in a row.
+        self.tt_last_rule: str = ''
+        self.tt_rule_repeats: int = 0
         # Walking back to Home once the session is over. The frames stay
         # claimed until Home is on screen: handing them back on a Race tab
         # screen is what cost five hours on 19 Sep.
