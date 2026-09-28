@@ -456,6 +456,22 @@ check("  while a normal flow with the odd double is left alone",
 
 # The whole-session cap used to sit behind the rules, so a session that kept
 # recognising something never reached it.
+# 28 Sep, 16:41: after the weekly tally the session pressed the new week's
+# Next, then its fixed second tap - Edit Team, on that page - and sat there
+# four minutes. Matched here against the real frame.
+print("\nEdit Team is backed out of, against real pixels")
+_eband = _cv2.imread('resource/uma_it/fixture/tt_edit_team_band.png', 0)
+check("the Edit Team fixture loads", _eband is not None)
+if _eband is not None:
+    _frame = _np.zeros((1280, 720), _np.uint8)
+    _frame[0:60, :] = _eband
+    ctx = FakeCtx(team_trials_while_waiting=True)
+    ctx.ctrl.get_screen = lambda to_gray=False, _f=_frame: _f
+    tt.image_match = _real_match
+    tt.run_frame(ctx)
+    check("Edit Team presses Back", ctx.ctrl.clicks == [NAME(P.TT_BACK)], str(ctx.ctrl.clicks))
+    check("  and counts as being in the flow", ctx.career.tt_in_flow is True)
+
 print("\nthe session cap holds while rules keep matching")
 ctx = FakeCtx(team_trials_while_waiting=True)
 only(T.REF_TT_SELECT_OPPONENT)

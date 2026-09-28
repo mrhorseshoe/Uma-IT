@@ -69,6 +69,7 @@ from uma_it.asset.template import (
     REF_TT_CANT_2,
     REF_TT_HIGH_SCORE,
     REF_TT_TALLYING,
+    REF_TT_EDIT_TEAM,
     REF_TT_HOME,
     REF_TT_NEXT_RESULT,
     REF_TT_SEE_ALL,
@@ -356,6 +357,10 @@ RULES = [
     # greyed out, so the Team Trials rule matches it too and presses a button
     # that does nothing.
     ("the tallying period", REF_TT_TALLYING, lambda ctx: _tallying(ctx)),
+    # Never the destination: Back returns to the Team Trials page, where Team
+    # Race is. On 28 Sep a session sat here four minutes until its quiet limit.
+    # TT_BACK is where this screen's Back button is - its OCR reads 'Back'.
+    ("the Edit Team screen", REF_TT_EDIT_TEAM, TT_BACK),
     ("Team Trials", REF_TT_TEAM_RACE, TT_TEAM_RACE),
     ("the opponent list", REF_TT_SELECT_OPPONENT, TT_SELECT_OPPONENT),
     ("the race screen", REF_TT_SEE_ALL, TT_SEE_ALL),
@@ -373,7 +378,7 @@ RULES = [
 # in its own flow.
 ENTERS_FLOW = {"the Race tab", "Team Trials", "the opponent list",
                "the race screen", "the results", "the team result",
-               "a new high score"}
+               "a new high score", "the Edit Team screen"}
 # Rules that are only safe once it is. REF_NEXT is a crop of a generic green
 # Next button, and the career setup screens have one too: on 25 Sep a session
 # that began on Support Formation matched it at 16:48:10, pressed Next into the

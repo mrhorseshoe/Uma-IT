@@ -108,6 +108,12 @@ REF_TT_HIGH_SCORE = Template("tt_high_score", REF_TEMPLATE_PATH)
 # lettering only. 1.000 on that frame, at most 0.448 on 205 other captures,
 # the ordinary Team Trials page among them.
 REF_TT_TALLYING = Template("tt_tallying", REF_TEMPLATE_PATH)
+# The "Edit Team" title label, top left. A session lands there after the new
+# week's results: it presses their Next, then its usual fixed second tap, which
+# on the Team Trials page is the Edit Team button. Cropped from the stuck
+# capture on 28 Sep: 1.000 on both Edit Team frames, 0.605 on the screens that
+# share the banner style with a different title.
+REF_TT_EDIT_TEAM = Template("tt_edit_team", REF_TEMPLATE_PATH)
 # "You have no RP" - the session's expected end. Both are searched inside the
 # region they occupy, because the crops are small enough to turn up elsewhere.
 # The countdown screen's menu holds "To Home" - and "Give Up", which abandons
