@@ -195,6 +195,18 @@ check("  and it is not a failure", _t.detail.consecutive_failures == 0,
       str(_t.detail.consecutive_failures))
 _sched.active = _was
 
+# The game demanding an update is the same shape: nothing started, nothing
+# will until a person acts, so the loop stops instead of retrying.
+print("\nthe game demanding an update stops the loop")
+_sched.active = True
+_t = build_task(LOOP, 1, "update", None, dict(REAL, loops_done=4, consecutive_failures=0))
+_t.end_task(TaskStatus.TASK_STATUS_FAILED, UmaItEndReason.APP_UPDATE_REQUIRED)
+check("the scheduler is stopped", _sched.active is False, str(_sched.active))
+check("  no run is counted", _t.detail.loops_done == 4, str(_t.detail.loops_done))
+check("  and it is not a failure", _t.detail.consecutive_failures == 0,
+      str(_t.detail.consecutive_failures))
+_sched.active = _was
+
 print("\nthe 3* blue override is coerced to blue sparks")
 t9a = build_task(LOOP, 1, "sparks", None,
                  dict(REAL, spark_keep_3star=['Stamina', 'power']))

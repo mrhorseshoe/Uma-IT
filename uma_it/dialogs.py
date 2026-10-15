@@ -181,6 +181,17 @@ def _silent(what: str):
     return action
 
 
+def _app_update_required(ctx):
+    """'Application Updated': the game needs a new version from the store.
+
+    Its only button is "To Store", which leaves the game for Google Play, and
+    tapping outside it does nothing. So nothing here clicks: the run ends and
+    the loop stops until someone updates the game (end_task says so).
+    """
+    log.info("Application Updated - the game must be updated before it will go on")
+    ctx.task.end_task(TaskStatus.TASK_STATUS_FAILED, EndTaskReason.APP_UPDATE_REQUIRED)
+
+
 def _career_complete(ctx):
     """The end-of-career "Return to the home screen?" prompt. Always Cancel.
 
@@ -445,6 +456,7 @@ DIALOGS = {
     'Data Update':      _tap_xy(383, 840, "Data Update - confirming"),
     'Data Download':    _tap_xy(383, 840, "Data Download - confirming"),
     'Date Changed':     _tap_xy(383, 840, "Date Changed - confirming"),
+    'Application Updated': _app_update_required,
 }
 
 

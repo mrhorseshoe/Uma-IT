@@ -143,6 +143,15 @@ check("'Sparks' clicks Close, not the corner",
       ctx.ctrl.clicks == [NAME(SPARKS_CLOSE)], str(ctx.ctrl.clicks))
 check("  and that is not the fallback click", NAME(SPARKS_CLOSE) != NAME(ESCAPE))
 
+# 7 Oct, 04:16: the game wanted a new version. The router did not know the
+# title, cleared it ~1,000 times and reopened the game for 45 minutes.
+print("\nthe game demanding an update")
+ctx = route('Application Updated')
+check("'Application Updated' clicks nothing - its only button leaves for the store",
+      ctx.ctrl.clicks == [], str(ctx.ctrl.clicks))
+check("  and ends the run as an update stop",
+      [r for _, r in ctx.ended] == [EndTaskReason.APP_UPDATE_REQUIRED], str(ctx.ended))
+
 print("\nending a career")
 ctx = route('Career Complete')
 check("'Career Complete' cancels the return prompt",

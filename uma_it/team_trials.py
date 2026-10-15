@@ -608,6 +608,7 @@ SESSION_ROUTED = {
     'Date Changed', 'Notices', 'Network Error', 'Connection Error',
     'Data Update', 'Data Download', 'Sparks', 'Perks', 'Borrow Card',
     'Follow Trainer', 'Rewards Collected', 'Event Story Unlocked',
+    'Application Updated',
 }
 
 

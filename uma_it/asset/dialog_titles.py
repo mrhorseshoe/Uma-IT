@@ -50,6 +50,7 @@ OWNED_TITLES = [
     'Data Update',
     'Data Download',
     'Date Changed',
+    'Application Updated',
     'Confirm',
     'Recover TP',
     'Items Selected',

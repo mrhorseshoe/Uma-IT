@@ -163,6 +163,7 @@ class EndTaskReason(Enum):
     TEAM_TRIALS_DONE = "Team trials finished; on to the next career"
     STOP_AT_SPARK_REROLL = "Stopped at the spark reroll screen"
     NO_LEGACY_BORROWS = "A legacy slot is empty - out of daily legacy borrows"
+    APP_UPDATE_REQUIRED = "The game must be updated through Google Play"
 
 
 class UmaItTaskType(Enum):
@@ -205,6 +206,16 @@ class UmaItTask(Task):
                 log.error("Legacy Select has an empty slot and Next is locked - "
                           "the daily legacy borrows have run out. Stopping the "
                           "loop; start it again once the borrows reset.")
+                from bot.engine.scheduler import scheduler
+                scheduler.stop()
+            elif detail is not None and reason is EndTaskReason.APP_UPDATE_REQUIRED:
+                # Nothing past this dialog works until a person updates the
+                # game. On 7 Oct the bot cleared it ~1,000 times and reopened
+                # the game every 29 seconds for 45 minutes; each reopen brought
+                # it straight back. Not a run and not a failed career.
+                log.error("The game says a new version is out and must be "
+                          "updated through Google Play. Stopping the loop; "
+                          "update the game, then start it again.")
                 from bot.engine.scheduler import scheduler
                 scheduler.stop()
             elif detail is not None and reason is EndTaskReason.TEAM_TRIALS_DONE:
