@@ -152,6 +152,28 @@ check("'Application Updated' clicks nothing - its only button leaves for the sto
 check("  and ends the run as an update stop",
       [r for _, r in ctx.ended] == [EndTaskReason.APP_UPDATE_REQUIRED], str(ctx.ended))
 
+# And without the router: whatever screen a frame was matched as, the dialog's
+# title is checked first. Against the real 7 Oct pixels.
+print("\nthe update dialog is caught on every frame, against real pixels")
+import cv2 as _cv2
+_band = _cv2.imread('resource/uma_it/fixture/app_updated_band.png')
+check("the update fixture loads", _band is not None)
+if _band is not None:
+    _frame = np.zeros((1280, 720, 3), np.uint8)
+    _frame[380:450, :] = _band
+    ctx = route('Daily Sale')           # any context with a task that records ends
+    ctx.ctrl.clicks.clear(); ctx.ended.clear()
+    ctx.current_screen = _frame
+    check("the dialog stops the loop", dialogs.stop_if_update_required(ctx) is True)
+    check("  as an update stop, clicking nothing",
+          [r for _, r in ctx.ended] == [EndTaskReason.APP_UPDATE_REQUIRED]
+          and ctx.ctrl.clicks == [], str((ctx.ended, ctx.ctrl.clicks)))
+    ctx.ended.clear()
+    ctx.current_screen = np.zeros((1280, 720, 3), np.uint8)
+    check("  and a frame without it goes on as normal",
+          dialogs.stop_if_update_required(ctx) is False and ctx.ended == [],
+          str(ctx.ended))
+
 print("\nending a career")
 ctx = route('Career Complete')
 check("'Career Complete' cancels the return prompt",

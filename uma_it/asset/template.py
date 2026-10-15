@@ -114,6 +114,12 @@ REF_TT_TALLYING = Template("tt_tallying", REF_TEMPLATE_PATH)
 # capture on 28 Sep: 1.000 on both Edit Team frames, 0.605 on the screens that
 # share the banner style with a different title.
 REF_TT_EDIT_TEAM = Template("tt_edit_team", REF_TEMPLATE_PATH)
+# The "Application Updated" title: the game will not go on until it is updated
+# through Google Play. The lettering only - the header is opaque, so whatever
+# is behind the dialog does not matter. Cropped from the live dialog on 7 Oct:
+# 1.000 on that frame, at most 0.551 on 790 other captures, every other
+# green-header dialog the bot has photographed among them.
+REF_APP_UPDATED = Template("app_updated", REF_TEMPLATE_PATH)
 # "You have no RP" - the session's expected end. Both are searched inside the
 # region they occupy, because the crops are small enough to turn up elsewhere.
 # The countdown screen's menu holds "To Home" - and "Give Up", which abandons

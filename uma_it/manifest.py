@@ -46,7 +46,7 @@ from uma_it.asset.ui import (
 )
 from uma_it import career, collect, enter, skills, spark
 from uma_it.context import build_context
-from uma_it.dialogs import script_dialog, script_not_found_ui
+from uma_it.dialogs import script_dialog, script_not_found_ui, stop_if_update_required
 from uma_it.screens import scan_ui_list
 from uma_it.task import APP_NAME, UmaItTaskType, build_task
 from uma_it import presets
@@ -213,6 +213,10 @@ script_dicts: Dict[UmaItTaskType, Dict[UI, Callable]] = {
 
 def exec_script(ctx):
     """Dispatch one frame to its handler."""
+    # Before anything, a team trials session included: nothing past this
+    # dialog works until the game is updated, so the loop stops.
+    if stop_if_update_required(ctx):
+        return
     # A team trials session claims every frame it runs through: the bot is on
     # the Race tab, where the career handlers' click points mean other things.
     # This sits here rather than in before_hook because the engine calls that

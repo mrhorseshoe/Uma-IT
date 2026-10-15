@@ -41,7 +41,7 @@ from bot.base.task import TaskStatus
 import bot.base.log as logger
 
 from uma_it import agenda, spark, start, team_trials, tp
-from uma_it.asset.template import UI_INFO, REF_NEXT
+from uma_it.asset.template import UI_INFO, REF_NEXT, REF_APP_UPDATED
 from uma_it.asset.dialog_titles import ALL_TITLES
 from uma_it.parse import find_green_button, is_spark_selection_screen
 from uma_it.asset.point import (
@@ -190,6 +190,22 @@ def _app_update_required(ctx):
     """
     log.info("Application Updated - the game must be updated before it will go on")
     ctx.task.end_task(TaskStatus.TASK_STATUS_FAILED, EndTaskReason.APP_UPDATE_REQUIRED)
+
+
+def stop_if_update_required(ctx) -> bool:
+    """Stop the loop if the game is demanding an update. True when it did.
+
+    Checked on every frame before anything else is dispatched, not only when
+    the frame reaches the dialog router: the executor hands a frame to
+    whichever matching screen answers first, a team trials session claims
+    every frame it runs through, and the dialog can come up over any of them.
+    One template match, so it costs a few milliseconds a frame.
+    """
+    screen = getattr(ctx, 'current_screen', None)
+    if screen is None or not image_match(screen, REF_APP_UPDATED).find_match:
+        return False
+    _app_update_required(ctx)
+    return True
 
 
 def _career_complete(ctx):
