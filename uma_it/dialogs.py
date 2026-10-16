@@ -411,6 +411,11 @@ DIALOGS = {
 
     # -- ending a career -----------------------------------------------------
     'Career Complete':      _career_complete,
+    # A trainer event's own end-of-career prompt, "Return to the event home
+    # screen?" (Cancel / Event Home), right after Career Complete. Declined
+    # with the corner click, which cleared it first time on all five careers
+    # of the Sparkly Magic Show event (15 Oct) and cannot land on Event Home.
+    'Event Home':           lambda ctx: _escape(ctx, "Event Home prompt - declining"),
     'Complete Career':      _tap(CULTIVATE_FINISH_CONFIRM_AGAIN,
                                  "Complete Career - confirming"),
     'Training Complete':    _tap(CULTIVATE_FINISH_RETURN_CONFIRM,

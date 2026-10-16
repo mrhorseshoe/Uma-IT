@@ -174,6 +174,13 @@ if _band is not None:
           dialogs.stop_if_update_required(ctx) is False and ctx.ended == [],
           str(ctx.ended))
 
+# 15 Oct: a trainer event asks "Return to the event home screen?" after
+# Career Complete. Its green button leaves for the event.
+print("\nthe event's return prompt")
+ctx = route('Event Home')
+check("'Event Home' is declined with the corner click",
+      ctx.ctrl.clicks == [NAME(ESCAPE)], str(ctx.ctrl.clicks))
+
 print("\nending a career")
 ctx = route('Career Complete')
 check("'Career Complete' cancels the return prompt",

@@ -32,6 +32,7 @@ OWNED_TITLES = [
     'Daily Carat Pack',
     'Sparks',
     'Career Complete',
+    'Event Home',
     'Complete Career',
     'Training Complete',
     'Umamusume Details',
