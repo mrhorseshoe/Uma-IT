@@ -319,8 +319,12 @@ try:
     _meta = json.load(open(skills_db.META_SHIPPED, encoding='utf-8'))
 except Exception as e:
     check("the shipped note exists", False, str(e))
-check("it counts the sparks", _meta.get('sparks') == len(vocab),
-      f"note says {_meta.get('sparks')}, vocabulary has {len(vocab)}")
+# The shipped note against the shipped list. `vocab` is whichever list is
+# active, and once the bot has learned a spark that is the user's copy in
+# userdata/, which is meant to outgrow the note.
+_shipped = json.load(open(spark_db.SHIPPED_PATH, encoding='utf-8'))
+check("it counts the sparks", _meta.get('sparks') == len(_shipped),
+      f"note says {_meta.get('sparks')}, shipped vocabulary has {len(_shipped)}")
 
 print("\nthe shipped vocabulary and the shipped skill list are different lists")
 # Category 147 is not category 47. If these ever became the same export, the
