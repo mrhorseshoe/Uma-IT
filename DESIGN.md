@@ -162,6 +162,17 @@ None of these is obvious from reading the code. All are load-bearing.
    returning byte-identical frames. **Raising the threshold cannot help** — a
    score of 0.000 trips any positive threshold. The open question is ADB /
    uiautomator2 / emulator screencap.
+
+   **No screenshot at all is a different failure, handled differently.** A
+   frozen frame still arrives, and restarting the game answers it. A device
+   that returns *nothing* - 4 Oct, 8 1/2 hours; 12 Oct, a MuMu crash that hung
+   the screenshot call itself for 4 hours - is the bot unable to see the
+   device, and restarting the game did nothing 329 times. `get_screen` now
+   gives up after 15 s, and a spell without screenshots climbs a ladder in
+   `bot/engine/device_watch.py`: reconnect at 60 s, restart the ADB server at
+   120 s and every 5 min after, stop the loop at 15 min (`DEVICE_LOST`, not a
+   run or a failure). Every step logs what `adb devices` says and the last
+   screenshot error, so the next spell says what it was.
 5. **Confirm on the career-start dialog is a one-way door.** Select Normal
    Mode, verify the switch took, *then* confirm. Confirming the wrong option
    starts an event career that cannot be backed out of.

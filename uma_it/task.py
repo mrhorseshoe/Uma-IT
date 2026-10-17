@@ -24,6 +24,7 @@ import time
 from enum import Enum
 
 from bot.base.task import Task, TaskExecuteMode, TaskStatus
+from bot.base.task import EndTaskReason as BotEndTaskReason
 import bot.base.log as logger
 
 from uma_it.define import ScenarioType
@@ -218,6 +219,12 @@ class UmaItTask(Task):
                           "update the game, then start it again.")
                 from bot.engine.scheduler import scheduler
                 scheduler.stop()
+            elif detail is not None and reason is BotEndTaskReason.DEVICE_LOST:
+                # The engine's screen watchdog gave up on a device that stopped
+                # returning screenshots, and has already stopped the loop and
+                # logged why. Not a failed career: the one in the game runs on,
+                # and the next Start collects it.
+                pass
             elif detail is not None and reason is EndTaskReason.TEAM_TRIALS_DONE:
                 # Neither a career nor an attempt at one: the loop filled a gap
                 # in the TP wait, which still stands and still holds it back.

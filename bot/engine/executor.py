@@ -13,6 +13,7 @@ from bot.base.resource import UI, NOT_FOUND_UI
 from bot.base.task import TaskStatus, Task, EndTaskReason
 from bot.conn.os import push_system_notification
 from bot.conn.u2_ctrl import U2AndroidController
+from bot.engine.device_watch import NoFrameLadder
 from bot.recog.image_matcher import template_match, image_match
 from bot.recog.ocr import reset_ocr
 from bot.recog.timeout_tracker import check_and_reset_timeout
@@ -162,6 +163,7 @@ class Executor:
             def screen_watchdog():
                 last_img = None
                 unchanged = 0
+                ladder = NoFrameLadder(controller)
 
                 def preprocess(im):
                     try:
@@ -180,18 +182,25 @@ class Executor:
                             update_watchdog = None 
 
                         img = controller.get_screen(to_gray=True)
+                        # No screenshot at all is not a frozen game: the bot
+                        # cannot see the device, and restarting a game it
+                        # cannot see is what it did 329 times on 4 Oct. The
+                        # ladder reconnects instead, and stops the loop when
+                        # that does not work - see device_watch.py.
+                        if ladder.tick(img is not None) == 'give_up':
+                            try:
+                                from bot.engine.scheduler import scheduler
+                                scheduler.stop()
+                            except Exception:
+                                pass
+                            task.end_task(TaskStatus.TASK_STATUS_FAILED, EndTaskReason.DEVICE_LOST)
+                            break
                         if img is None:
-                            unchanged += 1
-                            try:
-                                if update_watchdog:
-                                    update_watchdog(unchanged)
-                            except Exception:
-                                pass
-                            print(f"{unchanged}/{watchdog_threshold}", flush=True)
-                            try:
-                                log.info(f"watchdog {unchanged}/{watchdog_threshold}")
-                            except Exception:
-                                pass
+                            # A spell without screenshots is the ladder's; the
+                            # frozen-frame count starts again once they return.
+                            unchanged = 0
+                            last_img = None
+                            continue
                         else:
                             cur = preprocess(img)
                             if last_img is None:

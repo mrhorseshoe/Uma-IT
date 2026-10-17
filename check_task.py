@@ -207,6 +207,16 @@ check("  and it is not a failure", _t.detail.consecutive_failures == 0,
       str(_t.detail.consecutive_failures))
 _sched.active = _was
 
+# The engine's watchdog giving up on a silent device: it stops the loop
+# itself, and the task must not count it as a career, run or failed.
+print("\na lost device is neither a run nor a failure")
+from bot.base.task import EndTaskReason as _BotReason
+_t = build_task(LOOP, 1, "device", None, dict(REAL, loops_done=4, consecutive_failures=1))
+_t.end_task(TaskStatus.TASK_STATUS_FAILED, _BotReason.DEVICE_LOST)
+check("no run is counted", _t.detail.loops_done == 4, str(_t.detail.loops_done))
+check("  and the failure streak is untouched", _t.detail.consecutive_failures == 1,
+      str(_t.detail.consecutive_failures))
+
 print("\nthe 3* blue override is coerced to blue sparks")
 t9a = build_task(LOOP, 1, "sparks", None,
                  dict(REAL, spark_keep_3star=['Stamina', 'power']))

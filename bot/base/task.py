@@ -35,6 +35,7 @@ class EndTaskReason(Enum):
     MANUAL_ABORTED = "Task Manually Aborted"
     SYSTEM_ERROR = "System Error"
     SCENARIO_NOT_FOUND = "Scenario Not Found"
+    DEVICE_LOST = "No screenshots from the device, even after reconnecting"
 
 
 class Task(metaclass=ABCMeta):

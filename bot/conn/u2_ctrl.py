@@ -22,6 +22,16 @@ log = logger.get_logger(__name__)
 
 INPUT_BLOCKED = False
 
+# A screenshot is given up on after this long. A healthy one takes well under a
+# second; the watchdog ticks every 30s.
+SCREENSHOT_TIMEOUT = 15
+# Abandoned screenshot calls still waiting on a dead device, at most.
+MAX_STUCK_SCREENSHOTS = 3
+_stuck = []
+_stuck_lock = threading.Lock()
+# init_env, bounded the same way when the watchdog reconnects.
+RECONNECT_TIMEOUT = 45
+
 
 @dataclass
 class U2AndroidConfig:
@@ -215,27 +225,135 @@ class U2AndroidController(AndroidController):
                 log.error(f"Failed to connect to device {self.config.device_name}: {e2}")
                 raise
 
+    # Why the last screenshot failed, for the device watch's log lines; empty
+    # after a good one.
+    last_screen_error = ''
+
+    def _shoot(self):
+        """One screenshot, given up on after SCREENSHOT_TIMEOUT seconds.
+
+        The call has no timeout of its own. On 12 Oct MuMu crashed, the call
+        never returned, and both the main loop and the watchdog sat inside it
+        for four hours with nothing in the log. Timed out here it is just a
+        missing screenshot, which the watchdog knows how to escalate.
+
+        The abandoned call keeps its thread until it returns, if it ever does,
+        so only MAX_STUCK_SCREENSHOTS of them are allowed to pile up.
+        """
+        with _stuck_lock:
+            _stuck[:] = [t for t in _stuck if t.is_alive()]
+            if len(_stuck) >= MAX_STUCK_SCREENSHOTS:
+                self.last_screen_error = (f"{len(_stuck)} earlier screenshots never "
+                                          f"returned - not starting another")
+                return None
+        box = {}
+
+        def run():
+            try:
+                box['img'] = self.u2client.screenshot(format='opencv')
+            except Exception as e:
+                box['err'] = e
+
+        t = threading.Thread(target=run, daemon=True)
+        t.start()
+        t.join(SCREENSHOT_TIMEOUT)
+        if t.is_alive():
+            with _stuck_lock:
+                _stuck.append(t)
+            self.last_screen_error = f"screenshot did not return within {SCREENSHOT_TIMEOUT}s"
+            return None
+        if 'err' in box:
+            raise box['err']
+        return box.get('img')
+
     # get_screen 获取图片
     def get_screen(self, to_gray=False):
         try:
-            cur_screen = self.u2client.screenshot(format='opencv')
-        except Exception:
+            cur_screen = self._shoot()
+        except Exception as e:
+            self.last_screen_error = f"{type(e).__name__}: {e}"[:200]
             time.sleep(0.05)
             try:
-                cur_screen = self.u2client.screenshot(format='opencv')
-            except Exception:
+                cur_screen = self._shoot()
+            except Exception as e2:
+                self.last_screen_error = f"{type(e2).__name__}: {e2}"[:200]
                 return None
         try:
             if cur_screen is None or getattr(cur_screen, 'size', 0) == 0:
+                if cur_screen is not None:
+                    self.last_screen_error = "empty image"
                 return None
             h, w = cur_screen.shape[:2]
             if h < 100 or w < 100:
+                self.last_screen_error = f"image too small ({w}x{h})"
                 return None
+            self.last_screen_error = ''
             if to_gray:
                 return cv2.cvtColor(cur_screen, cv2.COLOR_BGR2GRAY)
             return cur_screen
-        except Exception:
+        except Exception as e:
+            self.last_screen_error = f"{type(e).__name__}: {e}"[:200]
             return None
+
+    # ===== device recovery, for bot/engine/device_watch.py =====
+
+    def _adb(self, *args, timeout=15):
+        """Run adb with a time limit; returns its stdout, or raises."""
+        out = subprocess.run([self.path + "adb.exe", *args], capture_output=True,
+                             timeout=timeout)
+        return out.stdout.decode(errors='replace')
+
+    def device_state(self) -> str:
+        """What `adb devices` says about this device, in a few words."""
+        name = self.config.device_name
+        try:
+            listing = self._adb("devices", timeout=10)
+        except subprocess.TimeoutExpired:
+            return "'adb devices' did not answer within 10s"
+        for line in listing.splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[0] == name:
+                return f"{name} is '{parts[1]}'"
+        others = [l.split()[0] for l in listing.splitlines()[1:] if l.strip()]
+        return f"{name} is not listed" + (f" (listed: {', '.join(others)})" if others else "")
+
+    def reconnect(self) -> None:
+        """Reconnect uiautomator2, given up on after RECONNECT_TIMEOUT seconds."""
+        box = {}
+
+        def run():
+            try:
+                self.init_env()
+                box['ok'] = True
+            except Exception as e:
+                box['err'] = e
+
+        t = threading.Thread(target=run, daemon=True)
+        t.start()
+        t.join(RECONNECT_TIMEOUT)
+        if t.is_alive():
+            raise TimeoutError(f"reconnecting did not finish within {RECONNECT_TIMEOUT}s")
+        if 'err' in box:
+            raise box['err']
+        # Calls still hung on the old connection are not this one's problem;
+        # left counted, they would refuse every screenshot after a recovery.
+        with _stuck_lock:
+            _stuck.clear()
+
+    def restart_adb_server(self) -> None:
+        """kill-server, start-server, and reconnect a network device.
+
+        After the emulator restarted on 16 Oct the ADB server no longer listed
+        emulator-5554 at all, and this is what brought it back.
+        """
+        try:
+            self._adb("kill-server", timeout=15)
+        except subprocess.TimeoutExpired:
+            log.warning("adb kill-server did not finish within 15s")
+        self._adb("start-server", timeout=30)
+        if ':' in self.config.device_name:
+            self._adb("connect", self.config.device_name, timeout=15)
+        time.sleep(2)
 
     # ===== ctrl =====
     def click_by_point(self, point: ClickPoint, random_offset=True, hold_duration=0):

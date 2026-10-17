@@ -211,7 +211,13 @@ in it are from the time each entry was written.
       trips the 30s watchdog and restarts the game. The in-game clock keeps
       perfect wall time across the event, so the game is fine and the bot's view
       of it is what stalls. Costs about 40 seconds and no careers. The open
-      question is ADB / uiautomator2 / emulator screencap, not the threshold
+      question is ADB / uiautomator2 / emulator screencap, not the threshold.
+      Not to be confused with *no* screenshot at all, which is now handled by
+      the device watch ladder (DESIGN.md, trap 4) and stops the loop rather
+      than restarting the game forever. That ladder is checked with fakes and
+      its steps on the live device, but no real silent spell has hit it yet:
+      killing the ADB server does not reproduce one - uiautomator2 heals that
+      by itself inside a single 7 s screenshot
 - [ ] **A packaging pass.** `requirements.txt` is inherited from the parent and
       installs a good deal this bot never imports
 
