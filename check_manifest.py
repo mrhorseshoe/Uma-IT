@@ -85,7 +85,7 @@ for u in manifest.ui_list:
 collisions = {n: len(v) for n, v in names.items() if len(v) > 1}
 # MAIN_MENU is the second deliberate case: its original crop - the bottom-nav
 # Home tab - scores 0.56 to 0.78 on real Home frames after an event decorated
-# that tab, so a second crop of the Race and Scout tabs was added beside it.
+# that tab, so a second crop of the tab labels was added beside it.
 # Both dispatch to the same handler, so sharing a name is the point.
 check("no two screens share a name, bar the crops of one screen",
       collisions == {"CULTIVATE_RESULT": 3}, str(collisions))

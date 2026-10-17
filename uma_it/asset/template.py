@@ -45,12 +45,19 @@ UI_MAIN_MENU = Template("MAIN_MENU", UI_TEMPLATE_PATH)
 # the click guard restarts the game: two to four restarts per turnover on
 # 24 Sep, every one of them landing back on the loading screen.
 #
-# This crop is the Race and Scout tabs at the bottom right, picked by diffing
-# those same three frames for a region that had not changed at all: mean
-# difference 0.00, and it scores 1.000 on all three while no other captured
-# screen beats 0.721. One of those three frames turned out to be Support
-# Formation, mislabelled - which is why the region picked is one the two share,
-# and why on its own it matched Support Formation and pressed Perks 3,289 times.
+# The first replacement was the Race and Scout tabs at the bottom right, icons
+# and labels. One of the three frames it was picked from turned out to be
+# Support Formation, mislabelled - which is why on its own it matched Support
+# Formation and pressed Perks 3,289 times. Then on 8 Oct the game put pink
+# notification badges on the Race and Scout icons, Home scored 0.858 against
+# 0.86, and the bot sat on Home for 1 3/4 hours not knowing it.
+#
+# This crop is the tab *labels* only: the end of the raised Home tab, then
+# "Race" and "Scout" (x 400-702, y 1230-1262). Badges sit on the icons' top
+# corners and event "Limited Time" ribbons above them, so neither reaches it.
+# Cut from Home on 16 Oct with the event up: 0.989 on the badged 8 Oct Home,
+# 0.966 or better on all 18 Home frames on disk, at most 0.613 on any other
+# capture - the Race and Scout screens, where another tab is raised, included.
 # Full frame, like every scanned template - see UI_GAME_LOADING for why a
 # search region here makes the screen undetectable.
 UI_MAIN_MENU_2 = Template("MAIN_MENU_2", UI_TEMPLATE_PATH)

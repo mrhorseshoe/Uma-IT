@@ -164,10 +164,21 @@ _sup = cv2.imread('resource/uma_it/fixture/support_title_region.png', 0)
 check("the Home fixtures load", _nav is not None and _sup is not None)
 if _nav is not None and _sup is not None:
     _frame = np.zeros((1280, 720), np.uint8)
-    _frame[1160:1280, 500:720] = _nav
+    _frame[1160:1280, 380:720] = _nav
     _found = []
     _Executor.detect_ui_sub(_Lock(), _HOME, _frame, _found)
     check("the nav bar alone is Home", _found == [_HOME], str([u.ui_name for u in _found]))
+    # 8 Oct: notification badges on the Race and Scout icons took the old crop
+    # to 0.858. The labels-only crop must not care.
+    _badged = cv2.imread('resource/uma_it/fixture/home_nav_badged_region.png', 0)
+    check("the badged nav bar fixture loads", _badged is not None)
+    if _badged is not None:
+        _bframe = np.zeros((1280, 720), np.uint8)
+        _bframe[1160:1280, 380:720] = _badged
+        _found = []
+        _Executor.detect_ui_sub(_Lock(), _HOME, _bframe, _found)
+        check("  and so is one with notification badges on its tabs",
+              _found == [_HOME], str([u.ui_name for u in _found]))
     _frame[150:200, 0:260] = _sup
     _found = []
     _Executor.detect_ui_sub(_Lock(), _HOME, _frame, _found)
