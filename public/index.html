@@ -70,6 +70,7 @@ h1 { font-size: 17px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
              letter-spacing: 0.06em; }
 .metric .v { font-size: 19px; font-variant-numeric: tabular-nums;
              font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+.metric .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
 .controls { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
 button {
@@ -217,7 +218,8 @@ pre#log {
   </div>
   <div class="metrics">
     <div class="metric"><div class="k">Time left</div><div class="v" id="remaining">—</div></div>
-    <div class="metric"><div class="k">Runs done</div><div class="v" id="runs">—</div></div>
+    <div class="metric"><div class="k">Runs done</div><div class="v" id="runs">—</div>
+      <div class="sub" id="runs-sub" hidden></div></div>
     <div class="metric"><div class="k">Sparks met</div><div class="v" id="sparkmet">—</div></div>
     <div class="metric"><div class="k">Limit</div><div class="v" id="limit">—</div></div>
   </div>
@@ -1000,7 +1002,8 @@ function shownStats(d) {
     setStatsBaseline(null);
     b = null;
   }
-  return b ? { runs: runs - b.runs, met: met - b.met } : { runs, met };
+  return b ? { runs: runs - b.runs, met: met - b.met, reset: true, total: runs }
+           : { runs, met, reset: false, total: runs };
 }
 
 function resetStats() {
@@ -1079,6 +1082,10 @@ function render(status, state) {
   // the task's real counts.
   const shown = d ? shownStats(d) : null;
   $("runs").textContent = shown ? shown.runs : "—";
+  // Without this a reset count reads as a short run: "15 of 15 careers" beside
+  // "Runs done 5" looked like a task that stopped early.
+  $("runs-sub").hidden = !(shown && shown.reset);
+  $("runs-sub").textContent = shown && shown.reset ? `since reset · ${shown.total} in all` : "";
   // Runs whose kept sparks met every requirement, out of the runs done.
   $("sparkmet").textContent = !d ? "—"
     : !d.spark_reroll_enabled ? "off"
