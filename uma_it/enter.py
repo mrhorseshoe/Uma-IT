@@ -294,6 +294,8 @@ def script_support_card_select(ctx):
     if image_match(ctx.ctrl.get_screen(to_gray=True),
                    REF_CULTIVATE_SUPPORT_CARD_EMPTY).find_match:
         name = ctx.task.detail.follow_support_card_name.strip()
+        ctx.career.borrow_skip = 0
+        ctx.career.borrow_refreshes = 0
         log.info(f"Support deck: borrow slot empty - looking for {name!r}"
                  if name else
                  "Support deck: borrow slot empty - taking the first card")
@@ -329,7 +331,12 @@ def script_follow_support_card_select(ctx):
     card, before spending a refresh on a new set of players. The parent wrote
     those two directions as two identical blocks; they are one loop here, which
     changes nothing about the order of the swipes.
+
+    With no card named, see `_take_first_card` instead.
     """
+    if not ctx.task.detail.follow_support_card_name.strip():
+        _take_first_card(ctx)
+        return
     for _ in range(BORROW_REFRESHES):
         for direction, (y_from, y_to) in (("down", (1000, 400)), ("up", (400, 1000))):
             for _pass in range(3):
@@ -349,6 +356,35 @@ def script_follow_support_card_select(ctx):
     log.warning(f"Borrow list: {ctx.task.detail.follow_support_card_name!r} not "
                 f"found after {BORROW_REFRESHES} refreshes - starting without it")
     ctx.ctrl.click_by_point(FOLLOW_SUPPORT_CARD_SELECT_REFRESH)
+
+
+def _take_first_card(ctx):
+    """One step of borrowing whatever card is selectable, one tap per frame.
+
+    A tap that works leaves the borrow list. A tap that leaves the bot here
+    means that card could not be selected, so the next frame takes the card
+    below it. The pause after a tap keeps a list that is still on its way out
+    from being read as a refusal. Once every card on the page has been tried,
+    the list is refreshed and the search starts again from the top.
+    """
+    img = ctx.ctrl.get_screen()
+    if find_support_card(ctx, img):
+        time.sleep(1.5)
+        return
+    if not _still_on_borrow_screen(ctx, img):
+        return
+    career = ctx.career
+    if career.borrow_refreshes >= BORROW_REFRESHES:
+        log.warning(f"Borrow list: no selectable card after {BORROW_REFRESHES} "
+                    f"refreshes - starting without one")
+        ctx.ctrl.click_by_point(FOLLOW_SUPPORT_CARD_SELECT_REFRESH)
+        return
+    career.borrow_refreshes += 1
+    career.borrow_skip = 0
+    log.info(f"Borrow list: no selectable card on this page - refreshing "
+             f"({career.borrow_refreshes}/{BORROW_REFRESHES})")
+    ctx.ctrl.click_by_point(FOLLOW_SUPPORT_CARD_SELECT_REFRESH)
+    time.sleep(1.2)
 
 
 def script_cultivate_final_check(ctx):

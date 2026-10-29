@@ -52,6 +52,13 @@ class CareerContext:
         self.career_mode_switch_tries: int = 0
         self.pending_run_tries: int = 0
 
+        # -- borrowing with no card named ----------------------------------
+        # A card can be on the list and still not be selectable. Each tap that
+        # leaves the bot on the borrow list moves on to the next card down;
+        # once the page is used up the list is refreshed and the count resets.
+        self.borrow_skip: int = 0
+        self.borrow_refreshes: int = 0
+
         # -- the dialog router ----------------------------------------------
         # `dialog_repeat` counts consecutive frames resolving to the same
         # title. A dialog that will not clear is worth a warning well before

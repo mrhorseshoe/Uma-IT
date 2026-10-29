@@ -277,11 +277,15 @@ def find_support_card(ctx, img):
 
 
 def _take_top_support_card(ctx, img) -> bool:
-    """Click the highest card on the borrow list, whatever it is.
+    """Click the highest card on the borrow list not already tried.
 
     The label match returns the best-scoring card, not the top one, so every
-    label is collected first and the one nearest the top wins. The cap only
-    guards against a match that blanking somehow fails to remove.
+    label is collected first and sorted top to bottom. The cap only guards
+    against a match that blanking somehow fails to remove.
+
+    `career.borrow_skip` counts the cards on this page already tapped. Being
+    back on the list after a tap means that card could not be selected, so the
+    next call takes the one below it. False once the page is used up.
     """
     found = []
     for _ in range(12):
@@ -291,10 +295,17 @@ def _take_top_support_card(ctx, img) -> bool:
         pos = match_result.matched_area
         found.append(match_result.center_point)
         img[pos[0][1]:pos[1][1], pos[0][0]:pos[1][0]] = 0
-    if not found:
+    found.sort(key=lambda p: p[1])
+    career = getattr(ctx, 'career', None)
+    skip = getattr(career, 'borrow_skip', 0)
+    if skip >= len(found):
+        # Nothing on screen, or every card here was tapped and none took.
         return False
-    x, y = min(found, key=lambda p: p[1])
-    log.info(f"Borrow list: no card named - taking the top one of {len(found)}")
+    x, y = found[skip]
+    if career is not None:
+        career.borrow_skip = skip + 1
+    log.info(f"Borrow list: no card named - taking card {skip + 1} of {len(found)}"
+             + ("" if skip == 0 else " (the ones above could not be selected)"))
     ctx.ctrl.click(x, y - 75, "Borrow the first card")
     return True
 

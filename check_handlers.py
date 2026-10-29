@@ -360,15 +360,16 @@ check("a full deck goes straight on",
       ctx.ctrl.clicks == [NAME(TO_CULTIVATE_PREPARE_NEXT)], str(ctx.ctrl.clicks))
 
 print("\nthe borrow list")
+NAMED = {"follow_support_card_name": "Wave of Gratitude"}
 enter.find_support_card = lambda _ctx, _img: True
-ctx = FakeCtx()
+ctx = FakeCtx(**NAMED)
 enter.script_follow_support_card_select(ctx)
 check("stops the moment the card is found",
       ctx.ctrl.clicks == [] and ctx.ctrl.swipes == [], f"{ctx.ctrl.clicks} {ctx.ctrl.swipes}")
 
 enter.find_support_card = lambda _ctx, _img: False
 enter._still_on_borrow_screen = lambda _ctx, _img: False
-ctx = FakeCtx()
+ctx = FakeCtx(**NAMED)
 enter.script_follow_support_card_select(ctx)
 check("stops scrolling once the screen has changed underneath it",
       ctx.ctrl.swipes == [], str(ctx.ctrl.swipes))
@@ -408,7 +409,51 @@ ctx = FakeCtx(follow_support_card_name="")
 check("  and with no card on screen it takes nothing",
       not parse.find_support_card(ctx, np.zeros((1280, 720, 3), np.uint8))
       and ctx.ctrl.clicks == [], str(ctx.ctrl.clicks))
-parse.image_match, parse.ocr_line = _real_match, _real_ocr
+print("\n  a card that cannot be selected")
+ctx = FakeCtx(follow_support_card_name="")
+taps = []
+for _ in range(4):
+    parse.image_match = _labels((200, 900), (200, 400), (200, 650))
+    ctx.ctrl.clicks = []
+    took = parse.find_support_card(ctx, np.zeros((1280, 720, 3), np.uint8))
+    taps.append(ctx.ctrl.clicks[0][1] if took else None)
+check("each tap that leaves it on the list moves one card down",
+      taps == [325, 575, 825, None], str(taps))
+parse.ocr_line = _real_ocr
+
+_real_find, _real_still = enter.find_support_card, enter._still_on_borrow_screen
+enter.find_support_card = lambda _ctx, _img: False
+enter._still_on_borrow_screen = lambda _ctx, _img: True
+ctx = FakeCtx(follow_support_card_name="", career_state={"borrow_skip": 3})
+enter.script_follow_support_card_select(ctx)
+check("a used-up page is refreshed and the search starts from the top",
+      ctx.ctrl.clicks == [NAME(enter.FOLLOW_SUPPORT_CARD_SELECT_REFRESH)]
+      and ctx.career.borrow_skip == 0 and ctx.career.borrow_refreshes == 1
+      and ctx.ctrl.swipes == [],
+      f"{ctx.ctrl.clicks} skip={ctx.career.borrow_skip} "
+      f"refreshes={ctx.career.borrow_refreshes} {ctx.ctrl.swipes}")
+
+ctx = FakeCtx(follow_support_card_name="",
+              career_state={"borrow_refreshes": enter.BORROW_REFRESHES})
+enter.script_follow_support_card_select(ctx)
+check("  and the refreshes are bounded",
+      ctx.career.borrow_refreshes == enter.BORROW_REFRESHES, str(ctx.career.borrow_refreshes))
+
+enter._still_on_borrow_screen = lambda _ctx, _img: False
+ctx = FakeCtx(follow_support_card_name="")
+enter.script_follow_support_card_select(ctx)
+check("  and nothing is clicked once the borrow list is gone",
+      ctx.ctrl.clicks == [], str(ctx.ctrl.clicks))
+enter.find_support_card, enter._still_on_borrow_screen = _real_find, _real_still
+
+enter.image_match = MATCH(True)
+ctx = FakeCtx(follow_support_card_name="",
+              career_state={"borrow_skip": 2, "borrow_refreshes": 5})
+enter.script_support_card_select(ctx)
+check("opening the borrow list starts the count again",
+      ctx.career.borrow_skip == 0 and ctx.career.borrow_refreshes == 0,
+      f"skip={ctx.career.borrow_skip} refreshes={ctx.career.borrow_refreshes}")
+parse.image_match = _real_match
 
 print("\nthe result screens")
 for fn, point, label in ((collect.script_cultivate_result, CULTIVATE_RESULT_CONFIRM,
