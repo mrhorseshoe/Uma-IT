@@ -110,17 +110,18 @@ Umamusume: Pretty Derby (Global). `deps/adb/adb.exe` ships with the repo.
 
 **5. Two game settings**, which the bot will not change for you:
 
-- the option to **keep the last agenda used** - the bot never loads an agenda,
-  so every career runs whichever one you last used;
+- **Use previous agenda** must be ticked on - the bot never loads an agenda, so
+  every career runs whichever one you last used;
 - **quick mode**, or team trials stalls on the race result.
 
 ## Running it
 
 **1. Start an Independent Training career yourself.** Set it up in the game
 exactly as you want every career to run - scenario, trainee, parents, support
-cards, race agenda, Training Focus - and press start. The game remembers all of
-it, and the bot starts each later career the same way. This career counts as
-the first run of the loop.
+cards, race agenda, Training Focus - and **make sure Use previous agenda is
+ticked on** before you press start. Without it, later careers will not run your
+agenda. The game remembers the rest, and the bot starts each later career the
+same way. This career counts as the first run of the loop.
 
 **2. Start the bot** while that career is counting down. Double-click
 `start.bat`, or:
