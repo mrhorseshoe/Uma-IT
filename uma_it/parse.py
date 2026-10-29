@@ -245,9 +245,15 @@ def find_support_card(ctx, img):
     nothing real while adding an OCR read that could only be wrong. The name
     match, which scored 0.97 and 1.00 on those careers, is what actually
     selects the card.
+
+    **A blank name takes the top card on the screen**, with no OCR at all. On
+    a fan run the borrowed card makes no difference, so there is nothing worth
+    searching for, and reading every name only costs time between careers.
     """
     detail = ctx.task.detail
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    if not detail.follow_support_card_name.strip():
+        return _take_top_support_card(ctx, img)
     while True:
         match_result = image_match(img, REF_FOLLOW_SUPPORT_CARD_DETECT_LABEL)
         if not match_result.find_match:
@@ -268,6 +274,29 @@ def find_support_card(ctx, img):
                            match_result.center_point[1] - 75,
                            f"Borrow {detail.follow_support_card_name}")
             return True
+
+
+def _take_top_support_card(ctx, img) -> bool:
+    """Click the highest card on the borrow list, whatever it is.
+
+    The label match returns the best-scoring card, not the top one, so every
+    label is collected first and the one nearest the top wins. The cap only
+    guards against a match that blanking somehow fails to remove.
+    """
+    found = []
+    for _ in range(12):
+        match_result = image_match(img, REF_FOLLOW_SUPPORT_CARD_DETECT_LABEL)
+        if not match_result.find_match:
+            break
+        pos = match_result.matched_area
+        found.append(match_result.center_point)
+        img[pos[0][1]:pos[1][1], pos[0][0]:pos[1][0]] = 0
+    if not found:
+        return False
+    x, y = min(found, key=lambda p: p[1])
+    log.info(f"Borrow list: no card named - taking the top one of {len(found)}")
+    ctx.ctrl.click(x, y - 75, "Borrow the first card")
+    return True
 
 
 # --- spark reroll ---------------------------------------------------------

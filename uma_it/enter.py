@@ -293,8 +293,10 @@ def script_support_card_select(ctx):
     """
     if image_match(ctx.ctrl.get_screen(to_gray=True),
                    REF_CULTIVATE_SUPPORT_CARD_EMPTY).find_match:
-        log.info(f"Support deck: borrow slot empty - looking for "
-                 f"{ctx.task.detail.follow_support_card_name!r}")
+        name = ctx.task.detail.follow_support_card_name.strip()
+        log.info(f"Support deck: borrow slot empty - looking for {name!r}"
+                 if name else
+                 "Support deck: borrow slot empty - taking the first card")
         ctx.ctrl.click_by_point(TO_FOLLOW_SUPPORT_CARD_SELECT)
         return
     log.info("Support deck: borrow slot already filled - going on")

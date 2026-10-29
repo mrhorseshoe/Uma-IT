@@ -373,6 +373,43 @@ enter.script_follow_support_card_select(ctx)
 check("stops scrolling once the screen has changed underneath it",
       ctx.ctrl.swipes == [], str(ctx.ctrl.swipes))
 
+print("\nthe borrow list with no card named")
+import uma_it.parse as parse
+
+
+def _labels(*centres):
+    """A fake label search that finds each centre once, then nothing."""
+    left = list(centres)
+
+    def fake(_img, _tpl):
+        if not left:
+            return type('M', (), {'find_match': False})()
+        cx, cy = left.pop(0)
+        return type('M', (), {'find_match': True, 'center_point': (cx, cy),
+                              'matched_area': ((cx - 10, cy - 5), (cx + 10, cy + 5))})()
+    return fake
+
+
+def _no_ocr(*_a, **_k):
+    raise AssertionError("OCR was called")
+
+
+_real_match, _real_ocr = parse.image_match, parse.ocr_line
+parse.ocr_line = _no_ocr
+for name in ("", "   "):
+    parse.image_match = _labels((200, 900), (200, 400), (200, 650))
+    ctx = FakeCtx(follow_support_card_name=name)
+    took = parse.find_support_card(ctx, np.zeros((1280, 720, 3), np.uint8))
+    check(f"a name of {name!r} takes the top card, not the best-scoring one",
+          took and ctx.ctrl.clicks == [(200, 325, "Borrow the first card")],
+          str(ctx.ctrl.clicks))
+parse.image_match = _labels()
+ctx = FakeCtx(follow_support_card_name="")
+check("  and with no card on screen it takes nothing",
+      not parse.find_support_card(ctx, np.zeros((1280, 720, 3), np.uint8))
+      and ctx.ctrl.clicks == [], str(ctx.ctrl.clicks))
+parse.image_match, parse.ocr_line = _real_match, _real_ocr
+
 print("\nthe result screens")
 for fn, point, label in ((collect.script_cultivate_result, CULTIVATE_RESULT_CONFIRM,
                           "cultivation result"),

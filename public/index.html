@@ -278,9 +278,9 @@ pre#log {
     </div>
     <div class="field">
       <label for="card">Support card to borrow
-        <span class="hint">Must match the in-game name exactly — it is read off the screen</span>
+        <span class="hint">Must match the in-game name exactly — it is read off the screen. Leave blank to take the first card on the list</span>
       </label>
-      <input type="text" id="card" placeholder="Wave of Gratitude">
+      <input type="text" id="card" placeholder="Blank = first card on the list">
     </div>
     <div class="field">
       <label for="loops">Run limit
@@ -1122,7 +1122,7 @@ function renderTask() {
   const d = task.detail || {};
   $("summary").innerHTML = [
     ["Scenario", SCENARIOS[d.scenario] || d.scenario],
-    ["Card", d.follow_support_card_name || "any"],
+    ["Card", d.follow_support_card_name || "first on the list"],
     ["Legacy", d.use_last_parents ? "keep last" : "auto-select"],
     ["Skills", d.skip_learn_skill ? "skipped" : "requested"],
     ["TP", d.allow_recover_tp ? "may spend" : "never spend"],
