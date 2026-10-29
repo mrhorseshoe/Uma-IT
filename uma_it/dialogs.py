@@ -40,7 +40,7 @@ from bot.recog.ocr import ocr_line, find_similar_text
 from bot.base.task import TaskStatus
 import bot.base.log as logger
 
-from uma_it import agenda, spark, start, team_trials, tp
+from uma_it import spark, start, team_trials, tp
 from uma_it.asset.template import UI_INFO, REF_NEXT, REF_APP_UPDATED
 from uma_it.asset.dialog_titles import ALL_TITLES
 from uma_it.parse import find_green_button, is_spark_selection_screen
@@ -462,14 +462,6 @@ DIALOGS = {
     'Choose Career Mode': start.script_choose_career_mode,
     'Start Event': lambda ctx: _escape(
         ctx, "Event start dialog - backing out to keep the loop on Normal Mode"),
-
-    # -- the race agenda picker ----------------------------------------------
-    # One state machine across three screens; see agenda.py. The phase it runs
-    # on is set by the Final Confirmation handler, which clicks Edit to start
-    # the flow.
-    'Agenda':     agenda.script_agenda,
-    'My Agendas': agenda.script_my_agendas,
-    'Overwrite':  agenda.script_agenda_overwrite,
 
     # -- connectivity, which can interrupt any screen ------------------------
     'Network Error':    _tap(NETWORK_ERROR_CONFIRM, "Network Error - confirming"),

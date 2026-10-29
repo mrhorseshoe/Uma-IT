@@ -1,8 +1,8 @@
 # Uma-IT
 
 A bot that loops **Independent Training** careers in Umamusume: Pretty Derby
-(Global) — enter a career, load the race agenda, wait out the run, buy skills,
-handle the sparks, start the next one. It deliberately does nothing else.
+(Global) — enter a career, wait out the run, buy skills, handle the sparks,
+start the next one. It deliberately does nothing else.
 
 There is no game API. Everything is OpenCV template matching and PaddleOCR over
 screenshots, with taps sent through uiautomator2 over ADB.
@@ -15,10 +15,13 @@ Training, and is a fresh, much smaller build rather than a fork. See
 
 ## Features
 
-**Loops careers unattended.** Home → scenario → trainee → borrow a support card
-by name → load your saved agenda → wait out the ~50 minute run → collect →
-repeat. The process restarts itself after every career, so loop counts,
-scheduler state and the task survive in `userdata/`.
+**Loops careers unattended.** Start one Independent Training career yourself,
+then start the bot: it picks the run up mid-countdown, collects it, and from
+then on repeats it - Home → scenario → trainee → borrow a support card (by
+name, or the first on the list) → wait out the ~50 minute run → collect. The
+game remembers the rest of your setup, so every career after the first is
+started the way you started that one. The process restarts itself after every
+career, so loop counts, scheduler state and the task survive in `userdata/`.
 
 **Buys skills, and does not leave points behind.** Spends in three stages:
 
@@ -105,13 +108,22 @@ available and logs which it used at startup. Packages must land in system Python
 **4. An Android emulator** at **720x1280** with ADB debugging, running
 Umamusume: Pretty Derby (Global). `deps/adb/adb.exe` ships with the repo.
 
-**5. Two things to set up in-game**, which the bot will not do for you: put the
-race agenda you want in **slot 1** of My Agendas, and have the support card you
-want to borrow available to follow.
+**5. Two game settings**, which the bot will not change for you:
+
+- the option to **keep the last agenda used** - the bot never loads an agenda,
+  so every career runs whichever one you last used;
+- **quick mode**, or team trials stalls on the race result.
 
 ## Running it
 
-Double-click `start.bat`, or:
+**1. Start an Independent Training career yourself.** Set it up in the game
+exactly as you want every career to run - scenario, trainee, parents, support
+cards, race agenda, Training Focus - and press start. The game remembers all of
+it, and the bot starts each later career the same way. This career counts as
+the first run of the loop.
+
+**2. Start the bot** while that career is counting down. Double-click
+`start.bat`, or:
 
 ```bash
 py -3.10 main.py
@@ -119,10 +131,25 @@ py -3.10 main.py
 
 Pick the emulator when asked; the dashboard opens on <http://127.0.0.1:8071>.
 
-**Starting the process starts the loop** — that is what lets a run survive the
-soft restart after each career. To come up without running one, stop it from the
-dashboard once it is up. **Stop it from the dashboard, not by killing the
-process**: run counts only reach disk when a run ends.
+**3. The first time only, set up the task** on the dashboard - see
+[Configuring a run](#configuring-a-run) - and press **Start**. After that the
+task is saved, and **starting the process starts the loop**.
+
+From there the bot takes over. It waits out the career you started, collects
+it, buys skills if that is switched on, rerolls the sparks if spark reroll is
+switched on and the roll misses your rule, then starts the next career and
+repeats until the run limit. Between careers it races team trials if you
+enabled that and has RP to spend.
+
+Leave the **Support card to borrow** field blank to take the first selectable
+card on the list - on a fan run the card makes no difference, and it saves the
+search. A named card has to match the in-game name exactly and be available to
+follow.
+
+**Stop it from the dashboard, not by killing the process**: run counts only
+reach disk when a run ends. Starting the process starts the loop because that
+is what lets a run survive the soft restart after each career; to come up
+without running one, stop it from the dashboard once it is up.
 
 To reach it from a phone without exposing it to your LAN, put it behind
 [Tailscale](https://tailscale.com) with `tailscale serve --bg 8071`. The
@@ -169,7 +196,7 @@ none of its turn-by-turn machinery is needed.
 | web UI | Vue 3 + Vite, build output committed; `TaskEditModal.vue` alone is 5,330 lines | one HTML file, no build step |
 | external assets | Bootstrap and jQuery from a CDN | none — works offline |
 | dialogs | one `TITLE` list; anything unmatched gets a blind corner click | 29 titles with handlers, scored against 30 decoys that deliberately lose |
-| tests | none tracked | 19 check scripts |
+| tests | none tracked | 20 check scripts |
 
 **Every screen is named.** An unhandled dialog in the parent looks exactly like
 a handled one, because the fallback silently clears it. Here the scoring set
@@ -198,7 +225,7 @@ including normal-career play.
 
 ## Development
 
-No test framework: 19 `check_*.py` scripts at the repo root drive real functions
+No test framework: 20 `check_*.py` scripts at the repo root drive real functions
 with fakes and assert on the clicks and decisions they produce.
 
 ```bash
@@ -225,7 +252,6 @@ what is still open.
 
 ## Known limits
 
-- **Agenda selection is always slot 1.** Copy the agenda you want there.
 - **Normal-career play is not supported.** Use the parent project.
 - **The dashboard has no authentication.**
 - **Windows in practice** — the bundled ADB is `adb.exe` and the launcher is a

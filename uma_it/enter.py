@@ -148,17 +148,6 @@ def script_main_menu(ctx):
         ctx.task.end_task(TaskStatus.TASK_STATUS_SUCCESS, EndTaskReason.COMPLETE)
         return
 
-    # A new career begins here, so forget what the agenda picker did for the
-    # last one. Normally the process soft-restarts between careers and rebuilds
-    # this, but when a career ends without the task ending, a stale 'done'
-    # makes the next career skip the agenda and run the game's default
-    # schedule - silently, which is this project's worst failure mode.
-    if career.agenda_phase:
-        log.info("New career - resetting the agenda picker")
-        career.agenda_phase = ''
-        career.agenda_steps = 0
-        career.agenda_waits = 0
-
     try:
         img = ctx.current_screen if ctx.current_screen is not None else ctx.ctrl.get_screen()
         btn = find_green_button(img, *CAREER_REGION)

@@ -35,15 +35,6 @@ class CareerContext:
         # Accumulated result screens, for the run summary.
         self.career_result: dict = {}
 
-        # -- the race agenda picker -----------------------------------------
-        # One state machine across three screens (Agenda / My Agendas /
-        # Overwrite). `agenda_steps` is a hard stop: the picker gives up and
-        # starts on whatever schedule the game already has rather than clicking
-        # forever.
-        self.agenda_phase: str = ''
-        self.agenda_steps: int = 0
-        self.agenda_waits: int = 0
-
         # -- starting a career ----------------------------------------------
         # Retry counters for the three one-way doors. Confirming the wrong
         # option on the career-mode dialog starts an event career that cannot

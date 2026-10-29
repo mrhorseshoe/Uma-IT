@@ -43,9 +43,6 @@ OWNED_TITLES = [
     'Independent Training',
     'Choose Career Mode',
     'Start Event',
-    'Agenda',
-    'My Agendas',
-    'Overwrite',
     'Network Error',
     'Connection Error',
     'Data Update',
@@ -93,6 +90,11 @@ DISTRACTOR_TITLES = [
     'Unmet Requirements',
     'Session Error',
     'areer Playthrough Difficulty Se',
+    # The agenda editor. The bot used to load an agenda through these; the
+    # game now keeps the last agenda used, so it never opens them.
+    'Agenda',
+    'My Agendas',
+    'Overwrite',
 ]
 
 # The set every OCR'd title is scored against. Build it from both lists,

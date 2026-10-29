@@ -15,13 +15,6 @@ TO_CULTIVATE_PREPARE_CONFIRM = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDI
 CULTIVATE_FINAL_CHECK_START = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(500, 1185), "Start Cultivation")
 FINAL_CONFIRMATION_TAB_INDEPENDENT = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(530, 216), "Final Confirmation - Independent Training tab")
 INDEPENDENT_TRAINING_RESULTS_OK = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(360, 1178), "Independent Training Results - OK")
-# Race agenda picker, reached from the Independent Training tab of the Final
-# Confirmation dialog: Edit -> My Agendas -> a slot's "Load List" -> Overwrite.
-AGENDA_EDIT = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(628, 614), "Final Confirmation - Edit Agenda")
-AGENDA_MY_AGENDAS = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(601, 1088), "Agenda - My Agendas")
-AGENDA_CLOSE = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(360, 1182), "Agenda - Close")
-AGENDA_OVERWRITE_CONFIRM = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(517, 918), "Agenda - Overwrite the current schedule")
-AGENDA_OVERWRITE_CANCEL = ClickPoint(ClickPointType.CLICK_POINT_TYPE_COORDINATE, None, Coordinate(202, 918), "Agenda - Cancel the overwrite")
 # "Independent Training" dialog, shown when CAREER is pressed on Home with a
 # run pending. Its green Career button enters the run; "Delete Data" sits at the
 # top right and must never be touched.
