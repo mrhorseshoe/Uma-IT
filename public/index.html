@@ -222,12 +222,15 @@ pre#log {
       <div class="sub" id="runs-sub" hidden></div></div>
     <div class="metric"><div class="k">Sparks met</div><div class="v" id="sparkmet">—</div></div>
     <div class="metric"><div class="k">Limit</div><div class="v" id="limit">—</div></div>
+    <div class="metric" title="Read off the start dialog of the last career the bot started"><div class="k">Agenda races</div><div class="v" id="races">—</div>
+      <div class="sub" id="races-sub" hidden></div></div>
   </div>
   <div class="controls">
     <button class="primary" id="start">Start</button>
     <button id="finish">Stop after this run</button>
     <button class="quiet" id="stop">Stop</button>
     <button class="quiet" id="reset-stats" title="Counts from zero on this screen. The bot's own run count and loop limit are not touched.">Reset stats</button>
+    <button class="quiet" id="reset-run" title="Sets the run count back to 0, so the next Start begins the loop from the first career. Only while stopped.">Reset run</button>
   </div>
   <div id="note"></div>
 </section>
@@ -1014,6 +1017,27 @@ function resetStats() {
   refresh();
 }
 
+/* Start the loop over from the first career. Reset stats only changes what
+   this screen shows; this clears the task's own counts, the same three that
+   Run again clears, so the next Start runs the full loop count again. Only
+   while stopped: writing the task replaces it, which a running loop is using. */
+async function resetRun() {
+  const d = task && task.detail;
+  if (!d) return;
+  if (!confirm(`Reset the run count to 0? The next Start begins at career 1 of ${d.loop_count || "∞"}.`)) return;
+  $("reset-run").disabled = true;
+  try {
+    await writeTask(Object.assign({}, d,
+                                  { loops_done: 0, consecutive_failures: 0,
+                                    spark_goal_runs: 0 }));
+    setStatsBaseline(null);
+    note("Run count reset - Start begins the loop from the first career.");
+  } catch (e) {
+    note("Could not reset the run: " + e.message, true);
+  }
+  refresh();
+}
+
 async function refresh() {
   try {
     const [status, state, tasks] = await Promise.all([
@@ -1091,7 +1115,14 @@ function render(status, state) {
     : !d.spark_reroll_enabled ? "off"
     : `${shown.met} of ${shown.runs}`;
   $("reset-stats").disabled = !d;
+  $("reset-run").disabled = !d || running || !(d.loops_done || d.consecutive_failures);
   $("limit").textContent = d ? (d.loop_count ? d.loop_count : "∞") : "—";
+  // The agenda the current career started with. A wrong one costs fans and
+  // says nothing anywhere else.
+  const races = d && d.agenda_races && d.agenda_races.scheduled != null ? d.agenda_races : null;
+  $("races").textContent = races ? races.scheduled : "—";
+  $("races-sub").hidden = !races;
+  $("races-sub").textContent = races ? `G1 ${races.g1} · G2 ${races.g2} · G3 ${races.g3}` : "";
 
   // Start does nothing once the limit is reached: the scheduler leaves a task
   // at SUCCESS and never restarts it, and reset-task only sets PENDING, which
@@ -1254,6 +1285,8 @@ async function saveTask(ev) {
     // Carried forward so editing a task does not reset the run count.
     loops_done: (task && task.detail && task.detail.loops_done) || 0,
     spark_goal_runs: (task && task.detail && task.detail.spark_goal_runs) || 0,
+    // Read off the game, not a setting: an edit must not blank it.
+    agenda_races: (task && task.detail && task.detail.agenda_races) || {},
     // Kept so saving a task mid-wait does not send it straight back to a
     // career the game will refuse. The clocks go with it: they are durable
     // state the task has earned, not settings, and an edit that reset them
@@ -1364,6 +1397,7 @@ $("delete").onclick = async () => {
 };
 
 $("reset-stats").onclick = resetStats;
+$("reset-run").onclick = resetRun;
 
 refresh();
 setInterval(refresh, 2000);

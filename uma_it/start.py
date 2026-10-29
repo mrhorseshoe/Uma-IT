@@ -30,9 +30,11 @@ from bot.base.task import TaskStatus, EndTaskReason
 from bot.recog.image_matcher import image_match
 from bot.recog.ocr import ocr_line
 
+from uma_it import agenda
 from uma_it.asset.point import (
     CULTIVATE_FINAL_CHECK_START,
     FINAL_CONFIRMATION_TAB_INDEPENDENT,
+    AGENDA_EDIT,
     CAREER_MODE_NORMAL,
     CAREER_MODE_CONFIRM,
     INDEPENDENT_TRAINING_PENDING_CAREER,
@@ -103,18 +105,13 @@ def script_choose_career_mode(ctx) -> None:
 
 def script_final_confirmation(ctx) -> None:
     """The career start dialog: make sure the Independent Training tab is up,
-    then confirm.
+    load the agenda, then confirm.
 
     The tab is *checked* rather than assumed. Both tabs keep whatever was
     picked last, so a run started on the wrong one plays a turn-by-turn career
     that this app has no handlers for at all. Everything else on the dialog -
-    the race agenda, Training Focus, Prioritized Skills - is remembered from
-    the user's own setup, so there is nothing else to set.
-
-    **The agenda is not loaded any more.** The bot used to open the editor and
-    load slot 1 before every run; the game now has an option to keep the last
-    agenda used, which does the same job with no clicks and no first-load
-    retry.
+    Training Focus, Prioritized Skills - is remembered from the user's own
+    setup, so there is nothing else to set.
     """
     career = getattr(ctx, 'career', None)
     on_independent = image_match(ctx.ctrl.get_screen(to_gray=True),
@@ -139,11 +136,28 @@ def script_final_confirmation(ctx) -> None:
     if career is not None:
         career.final_confirmation_tab_tries = 0
 
+    # Load the first saved agenda before starting. The Agenda block lives on
+    # this tab, and loading is idempotent - the game replaces the user-race
+    # set, so re-applying the same slot every run does not stack races.
+    #
+    # This is the handoff into agenda.py: set the phase, click Edit, and the
+    # Agenda / My Agendas / Overwrite handlers take it from there.
+    if on_independent and agenda._phase(ctx) != 'done':
+        if agenda._step(ctx):
+            log.info("Career start: loading the first saved agenda before starting")
+            agenda._set_phase(ctx, 'opening')
+            ctx.ctrl.click_by_point(AGENDA_EDIT)
+            time.sleep(1)
+            return
+
     if on_independent:
-        # Say what this run actually starts with. The game keeps the last
-        # agenda used, and these counts are the only visible sign of which one
-        # that is - the reason a four-race agenda once ran for fifteen careers
-        # unnoticed.
+        # Say what this run actually starts with. The agenda picker can load
+        # the wrong entry with no error anywhere - these counts are the only
+        # visible sign, and the reason a four-race agenda once ran for fifteen
+        # careers unnoticed. Kept on the task too, for the dashboard; an
+        # unreadable dialog clears it rather than leave the last career's
+        # counts standing in for this one's.
+        counts = None
         try:
             counts = agenda_schedule_counts(ctx.current_screen)
             if counts:
@@ -153,6 +167,11 @@ def script_final_confirmation(ctx) -> None:
                 log.warning("Could not read the scheduled race counts off the start dialog")
         except Exception as e:
             log.warning(f"Could not read the scheduled race counts: {e}")
+        detail = getattr(getattr(ctx, 'task', None), 'detail', None)
+        if detail is not None:
+            detail.agenda_races = ({k: int(counts.get(k, 0) or 0)
+                                    for k in ('scheduled', 'g1', 'g2', 'g3')}
+                                   if counts else {})
 
     log.info(f"Career start: confirming on the "
              f"{'Independent Training' if on_independent else 'Normal Career'} tab")

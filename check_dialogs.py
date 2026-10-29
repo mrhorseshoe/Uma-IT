@@ -286,14 +286,26 @@ dialogs.DIALOGS['Independent Training'](ctx)
 check("the pending-run handler is given the header position",
       seen == [((8, 391), (136, 440))], str(seen))
 
-print("\nthe agenda titles are decoys now")
-# The game keeps the last agenda used, so the bot no longer opens the agenda
-# editor. Its three titles stay in the scoring set - deleting one lets a
-# shorter title steal its frame - but nothing acts on them any more.
-from uma_it.asset.dialog_titles import DISTRACTOR_TITLES
-for title in ('Agenda', 'My Agendas', 'Overwrite'):
-    check(f"{title!r} has no handler and is still scored",
-          title not in dialogs.DIALOGS and title in DISTRACTOR_TITLES)
+print("\nthe agenda titles reach the picker")
+# What the picker then does is check_agenda.py's business. This pins only that
+# the router hands these three to it, rather than clearing them like a stray
+# dialog - which would abandon the flow mid-way and start the run on whatever
+# schedule the game happened to have.
+import uma_it.agenda as agenda_mod
+
+reached = []
+for title, fn in (('Agenda', 'script_agenda'),
+                  ('My Agendas', 'script_my_agendas'),
+                  ('Overwrite', 'script_agenda_overwrite')):
+    original = dialogs.DIALOGS[title]
+    dialogs.DIALOGS[title] = lambda _ctx, _t=title: reached.append(_t)
+    route(title)
+    dialogs.DIALOGS[title] = original
+    check(f"{title!r} is routed to agenda.py",
+          getattr(original, '__module__', '') == agenda_mod.__name__,
+          getattr(original, '__module__', '?'))
+check("  and all three were dispatched",
+      reached == ['Agenda', 'My Agendas', 'Overwrite'], str(reached))
 
 # A screen the blind click cannot advance is a trap: the clicks trip the
 # repetitive-click guard, the guard restarts the game, and the game comes back

@@ -23,8 +23,9 @@ sys.path.insert(0, os.getcwd())
 import numpy as np
 
 import uma_it.start as start
+import uma_it.agenda as agenda
 from uma_it.asset.point import (CAREER_MODE_NORMAL, CAREER_MODE_CONFIRM,
-                                CULTIVATE_FINAL_CHECK_START,
+                                CULTIVATE_FINAL_CHECK_START, AGENDA_EDIT,
                                 FINAL_CONFIRMATION_TAB_INDEPENDENT,
                                 INDEPENDENT_TRAINING_PENDING_CAREER)
 from uma_it.context import CareerContext
@@ -32,6 +33,7 @@ from uma_it.task import build_task
 from bot.base.task import TaskExecuteMode, TaskStatus, EndTaskReason
 
 start.time.sleep = lambda *_: None
+agenda.time.sleep = lambda *_: None
 
 # Kept before the stubs below replace it, so the real reader can be checked.
 real_event_mode_selected = start._event_mode_selected
@@ -122,17 +124,39 @@ check("after the budget it starts rather than tapping into the click guard",
       ctx.ctrl.clicks == [NAME(CULTIVATE_FINAL_CHECK_START)], str(ctx.ctrl.clicks))
 
 start.image_match = lambda *_a, **_k: type('M', (), {'find_match': True})()
-start.agenda_schedule_counts = lambda _img: {'scheduled': 47, 'g1': 23, 'g2': 11, 'g3': 11}
 ctx = FakeCtx()
 start.script_final_confirmation(ctx)
-check("the right tab confirms straight away - the game keeps the last agenda",
+check("the right tab hands off to the agenda picker first",
+      ctx.ctrl.clicks == [NAME(AGENDA_EDIT)], str(ctx.ctrl.clicks))
+check("  by setting the phase agenda.py runs on",
+      ctx.career.agenda_phase == 'opening', ctx.career.agenda_phase)
+
+start.agenda_schedule_counts = lambda _img: {'scheduled': 47, 'g1': 23, 'g2': 11, 'g3': 11}
+ctx = FakeCtx(agenda_phase='done')
+start.script_final_confirmation(ctx)
+check("a finished agenda flow confirms the start",
       ctx.ctrl.clicks == [NAME(CULTIVATE_FINAL_CHECK_START)], str(ctx.ctrl.clicks))
+check("  and keeps the race counts on the task for the dashboard",
+      ctx.task.detail.agenda_races == {'scheduled': 47, 'g1': 23, 'g2': 11, 'g3': 11},
+      str(ctx.task.detail.agenda_races))
 
 start.agenda_schedule_counts = lambda _img: None
-ctx = FakeCtx()
+ctx = FakeCtx(agenda_phase='done')
+ctx.task.detail.agenda_races = {'scheduled': 8, 'g1': 7, 'g2': 1, 'g3': 0}
 start.script_final_confirmation(ctx)
 check("  and still confirms when the race counts cannot be read",
       ctx.ctrl.clicks == [NAME(CULTIVATE_FINAL_CHECK_START)], str(ctx.ctrl.clicks))
+check("  clearing the last career's counts rather than showing them as this one's",
+      ctx.task.detail.agenda_races == {}, str(ctx.task.detail.agenda_races))
+
+print("\nthe race counts survive a save and reload")
+t = build_task(TaskExecuteMode.TASK_EXECUTE_MODE_LOOP, 1, "check", None,
+               {'agenda_races': {'scheduled': 47, 'g1': 23, 'g2': 11, 'g3': 11}})
+check("read back from the task payload",
+      t.detail.agenda_races == {'scheduled': 47, 'g1': 23, 'g2': 11, 'g3': 11},
+      str(t.detail.agenda_races))
+check("  and absent before the first career",
+      build_task(TaskExecuteMode.TASK_EXECUTE_MODE_LOOP, 1, "check", None, {}).detail.agenda_races == {})
 
 
 def boom(_img):
@@ -140,7 +164,7 @@ def boom(_img):
 
 
 start.agenda_schedule_counts = boom
-ctx = FakeCtx()
+ctx = FakeCtx(agenda_phase='done')
 start.script_final_confirmation(ctx)
 check("  and when reading them raises",
       ctx.ctrl.clicks == [NAME(CULTIVATE_FINAL_CHECK_START)], str(ctx.ctrl.clicks))

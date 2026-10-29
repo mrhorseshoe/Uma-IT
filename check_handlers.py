@@ -3,7 +3,9 @@
 Mostly these press Next, and the assertions are correspondingly plain. Three
 are not:
 
-* Home, which has to find CAREER on art that rotates with in-game events;
+* Home, where a stale agenda phase would make the next career run the game's
+  default schedule silently - the exact failure this project keeps designing
+  against;
 * Scenario Select, which must fail the task rather than start a career in the
   wrong scenario;
 * the finish screen, which is the only way into skill buying and gets visited
@@ -299,6 +301,15 @@ enter.script_main_menu(ctx)
 check("a finished career ends the task", [s for s, _ in ctx.ended] ==
       [TaskStatus.TASK_STATUS_SUCCESS], str(ctx.ended))
 check("  and clicks nothing on the way out", ctx.ctrl.clicks == [], str(ctx.ctrl.clicks))
+
+# A stale 'done' here makes the next career skip the agenda entirely and run
+# whatever schedule the game had - with nothing in the log to say so.
+ctx = FakeCtx(career_state={'agenda_phase': 'done', 'agenda_steps': 24, 'agenda_waits': 3})
+enter.script_main_menu(ctx)
+check("a new career clears the last one's agenda phase",
+      ctx.career.agenda_phase == '', repr(ctx.career.agenda_phase))
+check("  and its counters", (ctx.career.agenda_steps, ctx.career.agenda_waits) == (0, 0),
+      f"{ctx.career.agenda_steps} {ctx.career.agenda_waits}")
 
 print("\nScenario Select")
 enter.image_match = MATCH(True)

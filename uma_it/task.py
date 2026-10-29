@@ -150,6 +150,11 @@ class TaskDetail:
     # reason loops_done is; counted at the spark decision, in `uma_it/spark.py`,
     # because that is where the result is known.
     spark_goal_runs: int
+    # The race counts read off the start dialog of the last career the bot
+    # started - {'scheduled', 'g1', 'g2', 'g3'}, or {} before the first. Shown
+    # on the dashboard, because a wrong agenda costs fans silently: six careers
+    # ran an 8-race agenda on 29 Oct before anyone looked at the log.
+    agenda_races: dict
     # No `spark_reroll_use_carats`. In the parent that flag authorises a
     # 66-line flow that drives the in-game shop to buy TP with carats, and it
     # is not ported: carats are real currency, `allow_recover_tp` already
@@ -430,6 +435,9 @@ def build_task(task_execute_mode: TaskExecuteMode, task_type: int,
     td.spark_skill_targets = _skill_requirement_rows(data.get('spark_skill_targets'))
     td.spark_keep_3star = _blue_spark_names(data.get('spark_keep_3star'))
     td.spark_goal_runs = _int(data.get('spark_goal_runs'), 0, 0)
+    races = data.get('agenda_races')
+    td.agenda_races = ({k: _int(races.get(k), 0, 0) for k in ('scheduled', 'g1', 'g2', 'g3')}
+                       if isinstance(races, dict) and races else {})
 
     task = UmaItTask(app_name=APP_NAME,
                      task_execute_mode=task_execute_mode,

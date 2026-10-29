@@ -98,6 +98,7 @@ uma_it/
   dialogs.py          OCR-title dialog router
   career.py           the countdown handler (where the run spends its time)
   start.py            career start, career-mode failsafe, pending-run rescue
+  agenda.py           the My Agendas slot-1 picker
   enter.py            Home through to the start dialog
   collect.py          the result screens
   parse.py            screen reading no template can do
@@ -145,13 +146,13 @@ None of these is obvious from reading the code. All are load-bearing.
    located by colour search, not by template — and that search works, verified
    against a real Home frame and pinned by a fixture. The parent's claim that
    it had never once succeeded came from logging only its failures.
-2. **The agenda is the game's job, and the start dialog's race counts are
-   logged.** The bot used to load slot 1 itself, and getting that wrong was
-   silent: an unreadable scrollbar taken as row 1 ran a four-race agenda for
-   fifteen careers without anyone noticing. The game now keeps the last agenda
-   used, so the bot loads nothing - but the Scheduled / G1 / G2 / G3 counts it
-   logs at the start of each run are still the only sign of which agenda a run
-   has.
+2. **The agenda is slot 1, and the scrollbar is read before clicking.** An
+   unreadable scrollbar must *never* be treated as row 1 — that assumption ran
+   a four-race agenda for fifteen careers without anyone noticing. Picking by
+   name failed differently: a task saved with the field blank disabled the
+   picker for eleven careers. Leaving it to the game's own "Use previous
+   agenda" option failed too: on 29 Oct 2026 six careers in a row ran an
+   8-race agenda instead of the 47-race one, so the bot loads slot 1 again.
 3. **A waiting handler must click nothing.** The generic not-found fallback
    blind-clicks a corner under a fixed name, and 11 identical consecutive
    clicks trip the repetitive-click guard into restarting the game. The

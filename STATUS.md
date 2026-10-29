@@ -202,9 +202,10 @@ in it are from the time each entry was written.
       needs both sets under 9 rows — about 7% of tiebreaks — and has not come up
       in a real career. Covered by `check_spark.py` and by the 137 captured
       selection frames, not by the game
-- [x] **The agenda first-click retry** - gone with the agenda picker itself
-      (29 Oct 2026). The game now has an option to keep the last agenda used,
-      so the bot no longer opens the agenda editor at all
+- [ ] **The agenda first-click retry.** The first Load List click of a run does
+      not take; the flow reopens the list and clicks again, costing ~10s. It
+      happens once per career, every career. Three hypotheses have each been
+      disproved by measurement and the cause is still unknown. Harmless
 - [ ] **The watchdog capture stall** inherited from the parent: `get_screen`
       occasionally returns byte-identical frames during the countdown, which
       trips the 30s watchdog and restarts the game. The in-game clock keeps
@@ -272,6 +273,10 @@ py -3.10 check_dialogs.py
 
 ```bash
 py -3.10 check_career.py
+```
+
+```bash
+py -3.10 check_agenda.py
 ```
 
 ```bash
